@@ -2700,7 +2700,7 @@ async function writeHarvestSummary(count, total) {
   const summaryText = 'สรุปการเก็บเกี่ยว' + count + 'ต้น ทั้งหมด ' + total + 'บาท';
   const PROD_SHEET_ID = 1702725714; // gid ของชีต "ข้อมูลผลผลิต"
 
-  // ── Step 1: Append ข้อความ ──
+  // ── Step 1: Append summary + แถวเปล่า 1 แถว ──
   const appendUrl = 'https://sheets.googleapis.com/v4/spreadsheets/' +
                     HIST_CFG.SPREADSHEET_ID + '/values/' +
                     encodeURIComponent('ข้อมูลผลผลิต!A:A') +
@@ -2708,19 +2708,19 @@ async function writeHarvestSummary(count, total) {
   const appendRes = await fetch(appendUrl, {
     method: 'POST',
     headers: { 'Authorization': 'Bearer ' + gToken, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ values: [[summaryText]] }),
+    body: JSON.stringify({ values: [[summaryText], ['']] }),
   });
   if (appendRes.status === 401) { gToken = null; throw new Error('Token หมดอายุ'); }
   if (!appendRes.ok) throw new Error('Append HTTP ' + appendRes.status);
   const appendJson = await appendRes.json();
 
-  // หาหมายเลขแถวที่เพิ่งเขียน จาก updatedRange เช่น "'ข้อมูลผลผลิต'!A11:A11"
+  // หาหมายเลขแถวแรกที่เพิ่งเขียน จาก updatedRange เช่น "'ข้อมูลผลผลิต'!A11:A12"
   const updatedRange = (appendJson.updates || {}).updatedRange || '';
   const rowMatch = updatedRange.match(/[A-Z]+(\d+)/);
   if (!rowMatch) return appendJson;
-  const rowIndex = parseInt(rowMatch[1]) - 1; // 0-based
+  const rowIndex = parseInt(rowMatch[1]) - 1; // 0-based (แถว summary)
 
-  // ── Step 2: batchUpdate — merge A:C + format ──
+  // ── Step 2: batchUpdate — merge A:C + format summary + clear แถวเปล่า ──
   const fmtUrl = 'https://sheets.googleapis.com/v4/spreadsheets/' +
                  HIST_CFG.SPREADSHEET_ID + ':batchUpdate';
   await fetch(fmtUrl, {
@@ -2757,6 +2757,25 @@ async function writeHarvestSummary(count, total) {
                   fontSize: 15,
                   foregroundColor: { red: 0, green: 0, blue: 0 },
                 },
+              }
+            },
+            fields: 'userEnteredFormat(backgroundColor,horizontalAlignment,verticalAlignment,textFormat)',
+          }
+        },
+        // Clear format แถวเปล่า — ล้างสีเหลืองออก ให้เป็น default
+        {
+          repeatCell: {
+            range: {
+              sheetId: PROD_SHEET_ID,
+              startRowIndex: rowIndex + 1, endRowIndex: rowIndex + 2,
+              startColumnIndex: 0,         endColumnIndex: 3,
+            },
+            cell: {
+              userEnteredFormat: {
+                backgroundColor: { red: 1, green: 1, blue: 1 },
+                horizontalAlignment: 'LEFT',
+                verticalAlignment: 'MIDDLE',
+                textFormat: { bold: false, fontSize: 10, foregroundColor: { red: 0, green: 0, blue: 0 } },
               }
             },
             fields: 'userEnteredFormat(backgroundColor,horizontalAlignment,verticalAlignment,textFormat)',
