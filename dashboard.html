@@ -2698,91 +2698,55 @@ async function fetchProductionData() {
 // เขียนแถวสรุปใหม่ลงท้ายชีต + จัด format (merge, bold, yellow bg, center)
 async function writeHarvestSummary(count, total) {
   const summaryText = 'สรุปการเก็บเกี่ยว' + count + 'ต้น ทั้งหมด ' + total + 'บาท';
-  const PROD_SHEET_ID = 1702725714; // gid ของชีต "ข้อมูลผลผลิต"
+  const PROD_SHEET_ID = 1702725714;
+  const BASE = 'https://sheets.googleapis.com/v4/spreadsheets/' + HIST_CFG.SPREADSHEET_ID;
+  const H = { 'Authorization': 'Bearer ' + gToken, 'Content-Type': 'application/json' };
 
-  // ── Step 1: Append summary + แถวเปล่า 1 แถว ──
-  const appendUrl = 'https://sheets.googleapis.com/v4/spreadsheets/' +
-                    HIST_CFG.SPREADSHEET_ID + '/values/' +
-                    encodeURIComponent('ข้อมูลผลผลิต!A:A') +
-                    ':append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS';
-  const appendRes = await fetch(appendUrl, {
-    method: 'POST',
-    headers: { 'Authorization': 'Bearer ' + gToken, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ values: [[summaryText], ['-', '-', '-']] }),
-  });
+  // ── Step 1: Append แถว summary ──
+  const appendRes = await fetch(
+    BASE + '/values/' + encodeURIComponent('ข้อมูลผลผลิต!A:C') +
+    ':append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS',
+    { method: 'POST', headers: H, body: JSON.stringify({ values: [[summaryText]] }) }
+  );
   if (appendRes.status === 401) { gToken = null; throw new Error('Token หมดอายุ'); }
   if (!appendRes.ok) throw new Error('Append HTTP ' + appendRes.status);
   const appendJson = await appendRes.json();
 
-  // หาหมายเลขแถวแรกที่เพิ่งเขียน จาก updatedRange เช่น "'ข้อมูลผลผลิต'!A11:A12"
+  // หา row ของแถว summary จาก updatedRange
   const updatedRange = (appendJson.updates || {}).updatedRange || '';
-  const rowMatch = updatedRange.match(/[A-Z]+(\d+)/);
+  const rowMatch = updatedRange.match(/(\d+)/);
   if (!rowMatch) return appendJson;
-  const rowIndex = parseInt(rowMatch[1]) - 1; // 0-based (แถว summary)
+  const rowIndex  = parseInt(rowMatch[1]) - 1; // 0-based (summary)
+  const dashRow1  = rowIndex + 2;              // 1-based row ของแถว dash
 
-  // ── Step 2: batchUpdate — merge A:C + format summary + clear แถวเปล่า ──
-  const fmtUrl = 'https://sheets.googleapis.com/v4/spreadsheets/' +
-                 HIST_CFG.SPREADSHEET_ID + ':batchUpdate';
-  await fetch(fmtUrl, {
-    method: 'POST',
-    headers: { 'Authorization': 'Bearer ' + gToken, 'Content-Type': 'application/json' },
+  // ── Step 2: PUT dash separator ตรงๆ ที่แถวถัดไป ──
+  await fetch(
+    BASE + '/values/' + encodeURIComponent('ข้อมูลผลผลิต!A' + dashRow1 + ':C' + dashRow1) +
+    '?valueInputOption=USER_ENTERED',
+    { method: 'PUT', headers: H, body: JSON.stringify({ values: [['-', '-', '-']] }) }
+  );
+
+  // ── Step 3: batchUpdate — format summary + clear dash row ──
+  await fetch(BASE + ':batchUpdate', {
+    method: 'POST', headers: H,
     body: JSON.stringify({
       requests: [
-        // Merge columns A, B, C ในแถวสรุป
-        {
-          mergeCells: {
-            range: {
-              sheetId: PROD_SHEET_ID,
-              startRowIndex: rowIndex, endRowIndex: rowIndex + 1,
-              startColumnIndex: 0,    endColumnIndex: 3,
-            },
-            mergeType: 'MERGE_ALL',
-          }
-        },
-        // จัด format: พื้นเหลือง, ตัวหนา, ขนาด 15, ตรงกลาง, ตัวอักษรดำ
-        {
-          repeatCell: {
-            range: {
-              sheetId: PROD_SHEET_ID,
-              startRowIndex: rowIndex, endRowIndex: rowIndex + 1,
-              startColumnIndex: 0,    endColumnIndex: 3,
-            },
-            cell: {
-              userEnteredFormat: {
-                backgroundColor: { red: 1, green: 1, blue: 0 },
-                horizontalAlignment: 'CENTER',
-                verticalAlignment:   'MIDDLE',
-                textFormat: {
-                  bold: true,
-                  fontSize: 15,
-                  foregroundColor: { red: 0, green: 0, blue: 0 },
-                },
-              }
-            },
+        // Merge A:C แถว summary
+        { mergeCells: { range: { sheetId: PROD_SHEET_ID, startRowIndex: rowIndex, endRowIndex: rowIndex + 1, startColumnIndex: 0, endColumnIndex: 3 }, mergeType: 'MERGE_ALL' } },
+        // Format เหลือง ตัวหนา ตรงกลาง
+        { repeatCell: {
+            range: { sheetId: PROD_SHEET_ID, startRowIndex: rowIndex, endRowIndex: rowIndex + 1, startColumnIndex: 0, endColumnIndex: 3 },
+            cell: { userEnteredFormat: { backgroundColor: { red: 1, green: 1, blue: 0 }, horizontalAlignment: 'CENTER', verticalAlignment: 'MIDDLE', textFormat: { bold: true, fontSize: 15, foregroundColor: { red: 0, green: 0, blue: 0 } } } },
             fields: 'userEnteredFormat(backgroundColor,horizontalAlignment,verticalAlignment,textFormat)',
-          }
-        },
-        // Clear format แถวเปล่า — ล้างสีเหลืองออก ให้เป็น default
-        {
-          repeatCell: {
-            range: {
-              sheetId: PROD_SHEET_ID,
-              startRowIndex: rowIndex + 1, endRowIndex: rowIndex + 2,
-              startColumnIndex: 0,         endColumnIndex: 3,
-            },
-            cell: {
-              userEnteredFormat: {
-                backgroundColor: { red: 1, green: 1, blue: 1 },
-                horizontalAlignment: 'LEFT',
-                verticalAlignment: 'MIDDLE',
-                textFormat: { bold: false, fontSize: 10, foregroundColor: { red: 0, green: 0, blue: 0 } },
-              }
-            },
+        }},
+        // Clear format แถว dash — ขาว, ชิดซ้าย, ขนาด 10
+        { repeatCell: {
+            range: { sheetId: PROD_SHEET_ID, startRowIndex: rowIndex + 1, endRowIndex: rowIndex + 2, startColumnIndex: 0, endColumnIndex: 3 },
+            cell: { userEnteredFormat: { backgroundColor: { red: 1, green: 1, blue: 1 }, horizontalAlignment: 'LEFT', verticalAlignment: 'MIDDLE', textFormat: { bold: false, fontSize: 10, foregroundColor: { red: 0, green: 0, blue: 0 } } } },
             fields: 'userEnteredFormat(backgroundColor,horizontalAlignment,verticalAlignment,textFormat)',
-          }
-        }
+        }}
       ]
-    }),
+    })
   });
 
   return appendJson;
