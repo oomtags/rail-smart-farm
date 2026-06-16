@@ -930,11 +930,8 @@
 
     <!-- Tab buttons -->
     <div class="lp-tabs">
-      <button class="lp-tab active" id="tabLogin"    onclick="switchAuthTab('login')">
+      <button class="lp-tab active" id="tabLogin">
         <i class="fas fa-right-to-bracket"></i> เข้าสู่ระบบ
-      </button>
-      <button class="lp-tab"        id="tabRegister" onclick="switchAuthTab('register')">
-        <i class="fas fa-user-plus"></i> สมัครสมาชิก
       </button>
     </div>
 
@@ -966,49 +963,6 @@
       </button>
     </div>
 
-    <!-- ══ REGISTER FORM ══ -->
-    <div id="formRegister" style="display:none">
-      <div class="lp-group">
-        <div class="lp-label"><i class="fas fa-user"></i> ชื่อผู้ใช้ (a-z, 0-9, _)</div>
-        <div class="lp-input-wrap">
-          <input id="rgUser" class="lp-input" type="text" placeholder="เช่น farm_user01" spellcheck="false">
-          <span class="lp-input-icon"><i class="fas fa-user"></i></span>
-        </div>
-      </div>
-      <div class="lp-group">
-        <div class="lp-label"><i class="fas fa-envelope"></i> Email</div>
-        <div class="lp-input-wrap">
-          <input id="rgEmail" class="lp-input" type="email" placeholder="example@email.com">
-          <span class="lp-input-icon"><i class="fas fa-envelope"></i></span>
-        </div>
-      </div>
-      <div class="lp-group">
-        <div class="lp-label"><i class="fas fa-key"></i> รหัสผ่าน (อย่างน้อย 6 ตัว)</div>
-        <div class="lp-input-wrap">
-          <input id="rgPass" class="lp-input" type="password" placeholder="กรอกรหัสผ่าน...">
-          <span class="lp-input-icon"><i class="fas fa-key"></i></span>
-        </div>
-      </div>
-      <div class="lp-group">
-        <div class="lp-label"><i class="fas fa-check-double"></i> ยืนยันรหัสผ่าน</div>
-        <div class="lp-input-wrap">
-          <input id="rgConfirm" class="lp-input" type="password" placeholder="กรอกรหัสผ่านอีกครั้ง..."
-                 onkeydown="if(event.key==='Enter')doRegister()">
-          <span class="lp-input-icon"><i class="fas fa-check"></i></span>
-        </div>
-      </div>
-      <div class="lp-error" id="rgError">
-        <i class="fas fa-circle-exclamation"></i>
-        <span id="rgErrorMsg"></span>
-      </div>
-      <div class="lp-success" id="rgSuccess" style="display:none">
-        <i class="fas fa-circle-check"></i>
-        <span id="rgSuccessMsg"></span>
-      </div>
-      <button class="lp-btn" id="rgBtn" onclick="doRegister()">
-        <i class="fas fa-user-plus"></i> สมัครสมาชิก
-      </button>
-    </div>
 
     <div class="lp-hint">
       <i class="fas fa-shield-halved"></i>
@@ -2533,7 +2487,7 @@ initGIS();
 /* ══════════════════════════════════════════════
    🔐  LOGIN SYSTEM
    ══════════════════════════════════════════════ */
-(async function initLogin() {
+(function initLogin() {
   // Spawn floating particles
   const pc = document.getElementById('lpParticles');
   if (pc) {
@@ -2551,14 +2505,6 @@ initGIS();
       pc.appendChild(d);
     }
   }
-
-  // ── เช็ค PHP session (ถ้า login อยู่แล้ว ข้ามหน้า login เลย) ──
-  try {
-    const res  = await fetch('api/me.php', { credentials: 'include' });
-    const data = await res.json();
-    if (data.ok) { showDashboard(data.username); return; }
-  } catch(e) { /* XAMPP อาจไม่ได้รัน — ใช้โหมด offline ก็ได้ */ }
-
   const userEl = document.getElementById('lpUser');
   if (userEl) userEl.focus();
 })();
@@ -2576,22 +2522,11 @@ function togglePass() {
   }
 }
 
-/* ── Auth tab switch ── */
-function switchAuthTab(tab) {
-  document.getElementById('formLogin').style.display    = tab === 'login'    ? '' : 'none';
-  document.getElementById('formRegister').style.display = tab === 'register' ? '' : 'none';
-  document.getElementById('tabLogin').classList.toggle('active',    tab === 'login');
-  document.getElementById('tabRegister').classList.toggle('active', tab === 'register');
-  document.getElementById('lpError').classList.remove('show');
-  document.getElementById('rgError').classList.remove('show');
-  document.getElementById('rgSuccess').style.display = 'none';
-}
-
-/* ── Login (PHP API) ── */
-async function doLogin() {
-  const btn    = document.getElementById('lpBtn');
-  const errBox = document.getElementById('lpError');
-  const errMsg = document.getElementById('lpErrorMsg');
+/* ── Login (hardcoded) ── */
+function doLogin() {
+  const btn      = document.getElementById('lpBtn');
+  const errBox   = document.getElementById('lpError');
+  const errMsg   = document.getElementById('lpErrorMsg');
   const username = (document.getElementById('lpUser').value || '').trim();
   const password = (document.getElementById('lpPass').value || '');
 
@@ -2604,73 +2539,18 @@ async function doLogin() {
   btn.disabled = true;
   btn.innerHTML = '<span class="lp-spin"></span> กำลังตรวจสอบ...';
 
-  try {
-    const res  = await fetch('api/login.php', {
-      method: 'POST', credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password })
-    });
-    const data = await res.json();
-
-    if (data.ok) {
-      showDashboard(data.username);
+  setTimeout(() => {
+    if (username === 'ohm' && password === '123456789') {
+      showDashboard(username);
     } else {
-      errMsg.textContent = data.msg || 'เข้าสู่ระบบไม่สำเร็จ';
+      errMsg.textContent = 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง';
       errBox.classList.add('show');
       document.getElementById('lpPass').value = '';
       document.getElementById('lpPass').focus();
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-right-to-bracket"></i> เข้าสู่ระบบ';
     }
-  } catch(e) {
-    errMsg.textContent = 'ไม่สามารถเชื่อมต่อ Server ได้ (ตรวจสอบว่า XAMPP ทำงานอยู่)';
-    errBox.classList.add('show');
-  }
-
-  btn.disabled = false;
-  btn.innerHTML = '<i class="fas fa-right-to-bracket"></i> เข้าสู่ระบบ';
-}
-
-/* ── Register (PHP API) ── */
-async function doRegister() {
-  const btn     = document.getElementById('rgBtn');
-  const errBox  = document.getElementById('rgError');
-  const errMsg  = document.getElementById('rgErrorMsg');
-  const sucBox  = document.getElementById('rgSuccess');
-  const sucMsg  = document.getElementById('rgSuccessMsg');
-  errBox.classList.remove('show');
-  sucBox.style.display = 'none';
-
-  const username = (document.getElementById('rgUser').value    || '').trim();
-  const email    = (document.getElementById('rgEmail').value   || '').trim();
-  const password =  document.getElementById('rgPass').value    || '';
-  const confirm  =  document.getElementById('rgConfirm').value || '';
-
-  btn.disabled = true;
-  btn.innerHTML = '<span class="lp-spin"></span> กำลังสมัคร...';
-
-  try {
-    const res  = await fetch('api/register.php', {
-      method: 'POST', credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, email, password, confirm })
-    });
-    const data = await res.json();
-
-    if (data.ok) {
-      sucMsg.textContent = data.msg;
-      sucBox.style.display = 'flex';
-      ['rgUser','rgEmail','rgPass','rgConfirm'].forEach(id => document.getElementById(id).value = '');
-      setTimeout(() => switchAuthTab('login'), 2000);
-    } else {
-      errMsg.textContent = data.msg;
-      errBox.classList.add('show');
-    }
-  } catch(e) {
-    errMsg.textContent = 'ไม่สามารถเชื่อมต่อ Server ได้';
-    errBox.classList.add('show');
-  }
-
-  btn.disabled = false;
-  btn.innerHTML = '<i class="fas fa-user-plus"></i> สมัครสมาชิก';
+  }, 500);
 }
 
 function showDashboard(username) {
@@ -2694,8 +2574,7 @@ function showDashboard(username) {
   connectMQTT();
 }
 
-async function doLogout() {
-  try { await fetch('api/logout.php', { credentials: 'include' }); } catch(e) {}
+function doLogout() {
   if (typeof mqttClient !== 'undefined' && mqttClient) {
     try { mqttClient.end(true); } catch(e) {}
   }
