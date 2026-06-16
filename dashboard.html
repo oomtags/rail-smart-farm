@@ -2708,7 +2708,7 @@ async function writeHarvestSummary(count, total) {
   const appendRes = await fetch(appendUrl, {
     method: 'POST',
     headers: { 'Authorization': 'Bearer ' + gToken, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ values: [[summaryText], ['']] }),
+    body: JSON.stringify({ values: [[summaryText], ['-', '-', '-']] }),
   });
   if (appendRes.status === 401) { gToken = null; throw new Error('Token หมดอายุ'); }
   if (!appendRes.ok) throw new Error('Append HTTP ' + appendRes.status);
