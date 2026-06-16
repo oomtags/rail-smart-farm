@@ -1387,7 +1387,7 @@ const CFG = {
   TOPIC_LDR2:    '2RAIL_LDR2',
 
   // n8n AI Chat Webhook (ต้อง Activate Workflow 2 ก่อน)
-  N8N_WEBHOOK:   'http://localhost:5678/webhook/farm-chat',
+  N8N_WEBHOOK:   'https://ohmeaip.app.n8n.cloud/webhook/farm-chat',
 
   // จำนวนจุดสูงสุดในกราฟ
   MAX_PTS:       50,
@@ -1755,10 +1755,9 @@ async function sendMsg() {
   appendMsg(
     '❌ เชื่อมต่อ n8n ไม่ได้ทั้ง 2 URL\n\n' +
     '📋 ตรวจสอบตามนี้:\n' +
-    '1. เปิดหน้านี้จาก http://localhost:3000 (ไม่ใช่ file://)\n' +
-    '2. n8n กำลังทำงานอยู่ที่ localhost:5678\n' +
-    '3. กด Toggle "Activate" Workflow 2 ใน n8n ให้เป็นสีเขียว\n' +
-    '   หรือ เปิด node Webhook แล้วกด "Listen for test event"',
+    '1. เข้า ohmeaip.app.n8n.cloud แล้วเปิด Workflow AI Chat\n' +
+    '2. กด Toggle "Activate" ให้เป็นสีเขียว (Production)\n' +
+    '   หรือ เปิด node Webhook แล้วกด "Listen for test event" (Test)',
     'ai'
   );
   btn.disabled=false; inp.focus();
