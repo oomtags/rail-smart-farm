@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MQTT Real-Time Dashboard</title>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #22263a;
+      --border: #2d3148;
+      --accent: #4f80ff;
+      --accent2: #00d4aa;
+      --text: #e2e8f0;
+      --text2: #8892a4;
+      --danger: #ff4f6a;
+      --warn: #ffb347;
+      --success: #00d4aa;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* HEADER */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 24px;
+      display: flex; align-items: center; gap: 16px;
+      position: sticky; top: 0; z-index: 100;
+    }
+    header h1 { font-size: 1.1rem; font-weight: 700; letter-spacing: .5px; }
+    header h1 span { color: var(--accent); }
+    #status-badge {
+      display: flex; align-items: center; gap: 6px;
+      font-size: .78rem; background: var(--surface2);
+      border: 1px solid var(--border); border-radius: 20px;
+      padding: 4px 12px; margin-left: auto;
+    }
+    #status-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--text2); flex-shrink: 0;
+    }
+    #status-dot.connected    { background: var(--success); box-shadow: 0 0 6px var(--success); }
+    #status-dot.disconnected { background: var(--text2); }
+    #status-dot.reconnecting { background: var(--warn); animation: pulse .8s infinite; }
+    #status-dot.error        { background: var(--danger); }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+    /* LAYOUT */
+    .main { display: flex; flex: 1; overflow: hidden; }
+
+    /* SIDEBAR */
+    .sidebar {
+      width: 290px; min-width: 290px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      padding: 16px; gap: 14px; overflow-y: auto;
+    }
+    .sidebar h2 {
+      font-size: .8rem; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 1px; color: var(--text2); margin-bottom: 2px;
+    }
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    .form-group label { font-size: .78rem; color: var(--text2); }
+    .form-group input {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--text); padding: 7px 10px;
+      font-size: .85rem; outline: none; transition: border-color .2s;
+    }
+    .form-group input:focus { border-color: var(--accent); }
+    .form-group input::placeholder { color: var(--text2); opacity: .6; }
+    .hint { font-size: .7rem; color: var(--text2); opacity: .8; line-height: 1.4; }
+
+    .btn {
+      border: none; border-radius: 6px; padding: 8px 12px;
+      font-size: .85rem; font-weight: 600; cursor: pointer;
+      transition: opacity .2s, transform .1s;
+    }
+    .btn:active { transform: scale(.97); }
+    .btn:disabled { opacity: .4; cursor: not-allowed; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-danger  { background: var(--danger); color: #fff; }
+    .btn-row { display: flex; gap: 8px; }
+    .btn-row .btn { flex: 1; }
+    .divider { border: none; border-top: 1px solid var(--border); }
+
+    #topic-list { display: flex; flex-wrap: wrap; gap: 6px; min-height: 20px; }
+    .topic-pill {
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 12px; font-size: .75rem; padding: 3px 10px; color: var(--accent);
+    }
+    #msg-counter { font-size: .85rem; color: var(--text2); }
+    #msg-counter span { color: var(--text); font-weight: 700; }
+
+    #field-list { display: flex; flex-direction: column; gap: 4px; font-size: .8rem; }
+    .field-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 4px 8px; background: var(--surface2); border-radius: 5px;
+    }
+    .field-name { color: var(--accent2); font-weight: 600; }
+    .field-val  { color: var(--text); font-size: .75rem; }
+    .field-img  { color: var(--warn); font-size: .72rem; font-style: italic; }
+
+    /* CONTENT */
+    .content {
+      flex: 1; padding: 20px;
+      display: flex; flex-direction: column; gap: 20px;
+      overflow-y: auto;
+    }
+
+    /* METRIC CARDS */
+    #cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 14px;
+    }
+    .metric-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 16px;
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .metric-card .card-topic { font-size: .68rem; color: var(--text2);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .metric-card .card-key  { font-size: .78rem; color: var(--accent2); font-weight: 600; }
+    .metric-card .card-val  {
+      font-size: 2rem; font-weight: 700; color: var(--text);
+      line-height: 1; transition: color .3s;
+    }
+    .metric-card .card-val.flash { color: var(--accent); }
+
+    /* IMAGE CARD */
+    #images-grid { display: flex; flex-direction: column; gap: 20px; }
+    .image-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; overflow: hidden;
+    }
+    /* DeepDetect overlay canvas */
+    .img-main { position: relative; }
+    .img-main canvas.dd-overlay {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      pointer-events: none; z-index: 2;
+    }
+    /* DeepDetect stats bar */
+    .dd-bar {
+      display: none;
+      padding: 6px 14px; gap: 14px;
+      background: rgba(0,0,0,.55);
+      font-size: .75rem; font-family: monospace;
+      flex-wrap: wrap; align-items: center;
+      border-top: 1px solid var(--border);
+    }
+    .dd-bar.visible { display: flex; }
+    .dd-chip {
+      padding: 2px 10px; border-radius: 10px;
+      font-weight: 700; font-size: .72rem;
+    }
+    .dd-chip.growing { background: rgba(0,212,170,.2); color: #00d4aa; border: 1px solid #00d4aa55; }
+    .dd-chip.hole    { background: rgba(255,79,106,.2); color: #ff4f6a; border: 1px solid #ff4f6a55; }
+    .dd-ts  { color: var(--text2); margin-left: auto; }
+    .img-header {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      padding: 10px 16px; border-bottom: 1px solid var(--border);
+    }
+    .img-title { font-size: .85rem; font-weight: 600; color: var(--text2); flex: 1;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .img-title span { color: var(--text); }
+    .fps-badge {
+      font-size: .72rem; font-weight: 700; padding: 2px 10px;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 10px; color: var(--accent2); font-family: monospace;
+    }
+    .img-time { font-size: .7rem; color: var(--text2); font-family: monospace; }
+    .img-size { font-size: .7rem; color: var(--text2); }
+
+    .img-main {
+      background: #000; display: flex;
+      align-items: center; justify-content: center;
+      min-height: 260px; position: relative;
+    }
+    .img-main img { width: 100%; max-height: 520px; object-fit: contain; display: block; }
+    .img-main .paused-overlay {
+      display: none; position: absolute; top: 8px; right: 10px;
+      background: rgba(0,0,0,.65); color: var(--warn);
+      font-size: .75rem; font-weight: 700;
+      padding: 3px 10px; border-radius: 10px; pointer-events: none;
+    }
+    .img-main.is-paused .paused-overlay { display: block; }
+
+    .img-footer {
+      display: flex; gap: 8px; padding: 8px 14px;
+      border-top: 1px solid var(--border); background: var(--surface2);
+      align-items: center; flex-wrap: wrap;
+    }
+    .btn-pause {
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--text); border-radius: 6px;
+      padding: 4px 12px; font-size: .78rem; font-weight: 600; cursor: pointer;
+      transition: border-color .2s, color .2s;
+    }
+    .btn-pause.paused { border-color: var(--warn); color: var(--warn); }
+    .btn-dl {
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--text); border-radius: 6px; text-decoration: none;
+      padding: 4px 12px; font-size: .78rem; font-weight: 600; cursor: pointer;
+    }
+    .frame-counter { font-size: .72rem; color: var(--text2); margin-left: auto; }
+
+    /* CHARTS */
+    #charts-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+      gap: 16px;
+    }
+    .chart-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 16px;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .chart-card h3 { font-size: .85rem; font-weight: 600; color: var(--text2); }
+    .chart-card h3 span { color: var(--text); }
+    .chart-wrap { position: relative; height: 180px; }
+
+    /* LOG */
+    .log-panel {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 14px;
+    }
+    .log-panel h3 { font-size: .8rem; font-weight: 600; color: var(--text2);
+      margin-bottom: 8px; text-transform: uppercase; letter-spacing: .5px; }
+    #log-list {
+      max-height: 200px; overflow-y: auto;
+      display: flex; flex-direction: column; gap: 3px;
+      font-size: .75rem; font-family: 'Cascadia Code','Consolas',monospace;
+    }
+    #log-list::-webkit-scrollbar { width: 4px; }
+    #log-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    .log-row { display: flex; gap: 10px; padding: 3px 6px; border-radius: 4px; }
+    .log-row:hover { background: var(--surface2); }
+    .log-time  { color: var(--text2); flex-shrink: 0; }
+    .log-topic { color: var(--accent); flex-shrink: 0; max-width: 160px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .log-data  { color: var(--text); word-break: break-all; }
+    .log-img   { color: var(--warn); font-style: italic; }
+
+    /* EMPTY */
+    .empty {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 8px; padding: 40px;
+      color: var(--text2); font-size: .9rem;
+    }
+    .empty svg { opacity: .3; }
+
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>MQTT <span>Dashboard</span></h1>
+  <div id="status-badge">
+    <div id="status-dot"></div>
+    <span id="status-text">Disconnected</span>
+  </div>
+</header>
+
+<div class="main">
+  <aside class="sidebar">
+    <h2>Connection</h2>
+
+    <div class="form-group">
+      <label>Broker URL (WebSocket)</label>
+      <input id="inp-broker" type="text" placeholder="wss://broker.example.com:8084/mqtt"
+             value="wss://rail.kls.ac.th:9002" />
+      <span class="hint">ต้องเป็น ws:// หรือ wss:// เท่านั้น<br>เช่น wss://rail.kls.ac.th:9002</span>
+    </div>
+    <div class="form-group">
+      <label>Topics (คั่นด้วย ,)</label>
+      <input id="inp-topics" type="text" placeholder="sensors/#, Rail-IMG07" value="Rail-IMG07" />
+    </div>
+    <div class="form-group">
+      <label>Username (optional)</label>
+      <input id="inp-user" type="text" />
+    </div>
+    <div class="form-group">
+      <label>Password (optional)</label>
+      <input id="inp-pass" type="password" />
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" id="btn-connect">Connect</button>
+      <button class="btn btn-danger"  id="btn-disconnect" disabled>Disconnect</button>
+    </div>
+
+    <hr class="divider" />
+    <div>
+      <h2 style="margin-bottom:8px;">Topics Active</h2>
+      <div id="topic-list"></div>
+    </div>
+    <hr class="divider" />
+    <div>
+      <h2 style="margin-bottom:8px;">Latest Values</h2>
+      <div id="field-list"></div>
+    </div>
+    <hr class="divider" />
+    <div id="msg-counter">Messages: <span id="cnt">0</span></div>
+    <button class="btn btn-danger" id="btn-clear" style="margin-top:4px;">Clear Data</button>
+  </aside>
+
+  <main class="content">
+    <div id="cards-grid">
+      <div class="empty" id="empty-msg" style="grid-column:1/-1;">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M8.111 16.404a5.5 5.5 0 0 1 7.778 0M12 20h.01M4.929 12.929a9.5 9.5 0 0 1 14.142 0"/>
+        </svg>
+        <span>Connect to a broker to start receiving data</span>
+      </div>
+    </div>
+    <div id="images-grid"></div>
+    <div id="charts-grid"></div>
+    <div class="log-panel">
+      <h3>Message Log</h3>
+      <div id="log-list"></div>
+    </div>
+  </main>
+</div>
+
+<script>
+/* ─── State ─── */
+const MAX_POINTS = 60;
+const MAX_LOG    = 100;
+
+const charts       = {};
+const metricCards  = {};
+const imgStreams   = {};
+const latestValues = {};
+const seenTopics   = new Set();
+let msgCount = 0;
+let mqttClient = null;
+
+const CHART_COLORS = [
+  '#4f80ff','#00d4aa','#ffb347','#ff4f6a','#b47fff',
+  '#47ffd4','#ff6b6b','#6bffa1','#ffd447','#47b4ff',
+];
+let colorIdx = 0;
+const nextColor = () => CHART_COLORS[colorIdx++ % CHART_COLORS.length];
+
+/* ─── Status helper ─── */
+function setStatus(status, label) {
+  document.getElementById('status-dot').className = status;
+  document.getElementById('status-text').textContent = label;
+  const connected = status === 'connected';
+  document.getElementById('btn-connect').disabled    = connected;
+  document.getElementById('btn-disconnect').disabled = !connected;
+}
+
+/* ═══════════════════════════════════════════════
+   CONNECT / DISCONNECT
+════════════════════════════════════════════════ */
+document.getElementById('btn-connect').addEventListener('click', () => {
+  const brokerUrl = document.getElementById('inp-broker').value.trim();
+  const topicsRaw = document.getElementById('inp-topics').value.trim() || '#';
+  const username  = document.getElementById('inp-user').value.trim();
+  const password  = document.getElementById('inp-pass').value;
+
+  if (!brokerUrl) { alert('กรุณาใส่ Broker URL (ws:// หรือ wss://)'); return; }
+  if (!brokerUrl.startsWith('ws://') && !brokerUrl.startsWith('wss://')) {
+    alert('Broker URL ต้องขึ้นต้นด้วย ws:// หรือ wss://\nเช่น wss://broker.example.com:8084/mqtt');
+    return;
+  }
+
+  if (mqttClient) { mqttClient.end(true); mqttClient = null; }
+
+  seenTopics.clear();
+  document.getElementById('topic-list').innerHTML = '';
+  document.getElementById('field-list').innerHTML = '';
+
+  setStatus('reconnecting', 'Connecting…');
+
+  const opts = { reconnectPeriod: 3000, connectTimeout: 10000 };
+  if (username) opts.username = username;
+  if (password) opts.password = password;
+
+  mqttClient = mqtt.connect(brokerUrl, opts);
+
+  mqttClient.on('connect', () => {
+    setStatus('connected', `Connected · ${brokerUrl}`);
+    const topics = topicsRaw.split(',').map(t => t.trim()).filter(Boolean);
+    topics.forEach(t => mqttClient.subscribe(t, err => {
+      if (err) console.error('Subscribe error:', t, err);
+    }));
+  });
+
+  mqttClient.on('message', (topic, message) => {
+    // ── Binary image detection (JPEG: FF D8 FF | PNG: 89 50 4E 47) ──
+    if ((message[0] === 0xFF && message[1] === 0xD8 && message[2] === 0xFF) ||
+        (message[0] === 0x89 && message[1] === 0x50)) {
+      const mime    = message[0] === 0xFF ? 'image/jpeg' : 'image/png';
+      const dataUrl = `data:${mime};base64,${bufferToBase64(message)}`;
+      msgCount++;
+      document.getElementById('cnt').textContent = msgCount;
+      if (!seenTopics.has(topic)) {
+        seenTopics.add(topic);
+        const pill = document.createElement('div');
+        pill.className = 'topic-pill'; pill.textContent = topic;
+        document.getElementById('topic-list').appendChild(pill);
+      }
+      latestValues[`${topic}::image`] = '[image]';
+      pushImageFrame(topic, dataUrl, Date.now());
+      updateFieldList();
+      addLog(topic, [{ key: 'image', value: `[binary ${mime}]` }], Date.now(), true);
+      return;
+    }
+
+    const raw = message.toString();
+
+    // ── Raw base64 JPEG/PNG string (not wrapped in JSON) ──
+    if (raw.startsWith('/9j/') || raw.startsWith('iVBOR') ||
+        raw.startsWith('R0lGO') || raw.startsWith('UklGR')) {
+      const mime    = raw.startsWith('/9j/') ? 'image/jpeg' : 'image/png';
+      const dataUrl = `data:${mime};base64,${raw.trim()}`;
+      msgCount++;
+      document.getElementById('cnt').textContent = msgCount;
+      if (!seenTopics.has(topic)) {
+        seenTopics.add(topic);
+        const pill = document.createElement('div');
+        pill.className = 'topic-pill'; pill.textContent = topic;
+        document.getElementById('topic-list').appendChild(pill);
+      }
+      latestValues[`${topic}::image`] = '[image]';
+      pushImageFrame(topic, dataUrl, Date.now());
+      updateFieldList();
+      addLog(topic, [{ key: 'image', value: `[base64 ${mime}]` }], Date.now(), true);
+      return;
+    }
+
+    let payload;
+    try { payload = JSON.parse(raw); }
+    catch { payload = { value: raw }; }
+
+    // ── DeepDetect JSON payload → overlay bounding boxes ──
+    if (payload.payload && payload.payload.DeepDetect) {
+      handleDeepDetect(topic, payload);
+      return;
+    }
+
+    handleMessage(topic, payload);
+  });
+
+  mqttClient.on('reconnect', () => setStatus('reconnecting', 'Reconnecting…'));
+  mqttClient.on('error',     (err) => setStatus('error', `Error: ${err.message}`));
+  mqttClient.on('close',     () => setStatus('disconnected', 'Disconnected'));
+  mqttClient.on('offline',   () => setStatus('disconnected', 'Offline'));
+});
+
+document.getElementById('btn-disconnect').addEventListener('click', () => {
+  if (mqttClient) { mqttClient.end(true); mqttClient = null; }
+  setStatus('disconnected', 'Disconnected');
+});
+
+/* ═══════════════════════════════════════════════
+   MESSAGE HANDLER
+════════════════════════════════════════════════ */
+function handleMessage(topic, payload) {
+  msgCount++;
+  document.getElementById('cnt').textContent = msgCount;
+
+  if (!seenTopics.has(topic)) {
+    seenTopics.add(topic);
+    const pill = document.createElement('div');
+    pill.className = 'topic-pill';
+    pill.textContent = topic;
+    document.getElementById('topic-list').appendChild(pill);
+  }
+
+  const flat = flattenPayload(payload);
+  const ts   = Date.now();
+  let hasImage = false;
+
+  flat.forEach(({ key, value }) => {
+    const dataUrl = extractDataUrl(key, value);
+    if (dataUrl) {
+      hasImage = true;
+      latestValues[`${topic}::${key}`] = '[image]';
+      pushImageFrame(topic, dataUrl, ts);
+    } else {
+      latestValues[`${topic}::${key}`] = value;
+      if (typeof value === 'number') {
+        updateMetricCard(`${topic}::${key}`, topic, key, value);
+        updateChart(`${topic}::${key}`, topic, key, value, ts);
+      }
+    }
+  });
+
+  updateFieldList();
+  addLog(topic, flat, ts, hasImage);
+}
+
+/* ═══════════════════════════════════════════════
+   IMAGE DETECTION
+════════════════════════════════════════════════ */
+const IMG_KEY_HINTS = /image|img|frame|photo|pic|cam|snapshot|jpeg|jpg|png/i;
+
+function extractDataUrl(key, value) {
+  if (typeof value !== 'string' || value.length < 64) return null;
+  if (/^data:image\//i.test(value)) return value;
+  const m = value.match(/data:image\/[a-zA-Z+\-]+;base64,[A-Za-z0-9+/]+=*/);
+  if (m) return m[0];
+  const b64head = value.substring(0, 100).replace(/\s/g, '');
+  if (/^[A-Za-z0-9+/]+=*$/.test(b64head) && (IMG_KEY_HINTS.test(key) || value.length > 8000)) {
+    if (value.startsWith('/9j/'))  return `data:image/jpeg;base64,${value}`;
+    if (value.startsWith('iVBOR')) return `data:image/png;base64,${value}`;
+    if (value.startsWith('R0lGO')) return `data:image/gif;base64,${value}`;
+    if (value.startsWith('UklGR')) return `data:image/webp;base64,${value}`;
+    return `data:image/jpeg;base64,${value}`;
+  }
+  return null;
+}
+
+function approxKiB(dataUrl) {
+  const b64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
+  const bytes = Math.round(b64.replace(/=+$/, '').length * 3 / 4);
+  return bytes < 1024 ? `${bytes} B` : `${(bytes / 1024).toFixed(1)} KB`;
+}
+
+/* ═══════════════════════════════════════════════
+   IMAGE STREAM CARD (1 card per topic)
+════════════════════════════════════════════════ */
+function pushImageFrame(topic, dataUrl, timestamp) {
+  document.getElementById('empty-msg')?.remove();
+
+  if (!imgStreams[topic]) {
+    const card = document.createElement('div');
+    card.className = 'image-card';
+    card.innerHTML = `
+      <div class="img-header">
+        <span class="img-title">📷 <span>${topic}</span></span>
+        <span class="fps-badge">— FPS</span>
+        <span class="img-time">—</span>
+        <span class="img-size"></span>
+      </div>
+      <div class="img-main">
+        <img src="" alt="waiting for frame…" />
+        <canvas class="dd-overlay"></canvas>
+        <div class="paused-overlay">⏸ PAUSED</div>
+      </div>
+      <div class="dd-bar" id="ddbar-${topic.replace(/[^a-z0-9]/gi,'_')}">
+        <span>🤖 DeepDetect</span>
+        <span class="dd-chip growing" id="dd-growing-${topic.replace(/[^a-z0-9]/gi,'_')}">🌱 Growing: 0</span>
+        <span class="dd-chip hole"    id="dd-hole-${topic.replace(/[^a-z0-9]/gi,'_')}">🕳️ Hole: 0</span>
+        <span class="dd-ts"           id="dd-ts-${topic.replace(/[^a-z0-9]/gi,'_')}">—</span>
+      </div>
+      <div class="img-footer">
+        <button class="btn-pause">⏸ Pause</button>
+        <button class="btn-overlay btn-pause">🔲 Overlay</button>
+        <a class="btn-dl" download="frame.jpg">⬇ Save frame</a>
+        <span class="frame-counter">0 frames</span>
+      </div>`;
+
+    document.getElementById('images-grid').appendChild(card);
+
+    const tid = topic.replace(/[^a-z0-9]/gi,'_');
+    const st = {
+      mainImg:     card.querySelector('.img-main img'),
+      mainDiv:     card.querySelector('.img-main'),
+      overlay:     card.querySelector('canvas.dd-overlay'),
+      fpsBadge:    card.querySelector('.fps-badge'),
+      timeBadge:   card.querySelector('.img-time'),
+      sizeBadge:   card.querySelector('.img-size'),
+      fcBadge:     card.querySelector('.frame-counter'),
+      dlLink:      card.querySelector('.btn-dl'),
+      pauseBtn:    card.querySelector('.btn-pause'),
+      overlayBtn:  card.querySelector('.btn-overlay'),
+      ddBar:       card.querySelector('.dd-bar'),
+      ddGrowing:   card.querySelector(`#dd-growing-${tid}`),
+      ddHole:      card.querySelector(`#dd-hole-${tid}`),
+      ddTs:        card.querySelector(`#dd-ts-${tid}`),
+      frameCount:  0,
+      lastTimes:   [],
+      paused:      false,
+      showOverlay: true,
+      lastDetect:  null,
+    };
+
+    st.pauseBtn.addEventListener('click', () => {
+      st.paused = !st.paused;
+      st.pauseBtn.textContent = st.paused ? '▶ Resume' : '⏸ Pause';
+      st.pauseBtn.classList.toggle('paused', st.paused);
+      st.mainDiv.classList.toggle('is-paused', st.paused);
+    });
+
+    st.overlayBtn.addEventListener('click', () => {
+      st.showOverlay = !st.showOverlay;
+      st.overlayBtn.textContent = st.showOverlay ? '🔲 Overlay' : '⬜ Overlay';
+      st.overlayBtn.classList.toggle('paused', !st.showOverlay);
+      if (!st.showOverlay) {
+        const ctx = st.overlay.getContext('2d');
+        ctx.clearRect(0, 0, st.overlay.width, st.overlay.height);
+      } else if (st.lastDetect) {
+        drawOverlay(st, st.lastDetect);
+      }
+    });
+
+    imgStreams[topic] = st;
+  }
+
+  const st = imgStreams[topic];
+  st.frameCount++;
+
+  const now = Date.now();
+  st.lastTimes.push(now);
+  if (st.lastTimes.length > 10) st.lastTimes.shift();
+  if (st.lastTimes.length >= 2) {
+    const span = (st.lastTimes.at(-1) - st.lastTimes[0]) / 1000;
+    st.fpsBadge.textContent = `${((st.lastTimes.length - 1) / span).toFixed(1)} FPS`;
+  }
+
+  st.timeBadge.textContent = new Date(timestamp).toLocaleTimeString('th-TH', { hour12: false });
+  st.sizeBadge.textContent = approxKiB(dataUrl);
+  st.fcBadge.textContent   = `${st.frameCount} frames`;
+
+  if (!st.paused) {
+    st.mainImg.src = dataUrl;
+    st.dlLink.href = dataUrl;
+    st.dlLink.download = `${topic}_${st.frameCount}.jpg`;
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   METRIC CARDS
+════════════════════════════════════════════════ */
+function updateMetricCard(id, topic, key, value) {
+  document.getElementById('empty-msg')?.remove();
+  if (!metricCards[id]) {
+    const card = document.createElement('div');
+    card.className = 'metric-card';
+    card.innerHTML = `
+      <div class="card-topic">${topic}</div>
+      <div class="card-key">${key}</div>
+      <div class="card-val">—</div>`;
+    document.getElementById('cards-grid').appendChild(card);
+    metricCards[id] = card.querySelector('.card-val');
+  }
+  const el = metricCards[id];
+  el.textContent = formatNum(value);
+  el.classList.remove('flash');
+  void el.offsetWidth;
+  el.classList.add('flash');
+  setTimeout(() => el.classList.remove('flash'), 600);
+}
+
+/* ═══════════════════════════════════════════════
+   CHARTS
+════════════════════════════════════════════════ */
+function updateChart(id, topic, key, value, timestamp) {
+  if (!charts[id]) {
+    const color = nextColor();
+    const wrap = document.createElement('div');
+    wrap.className = 'chart-card';
+    wrap.innerHTML = `
+      <h3>${key} — <span>${topic}</span></h3>
+      <div class="chart-wrap"><canvas></canvas></div>`;
+    document.getElementById('charts-grid').appendChild(wrap);
+    const ctx = wrap.querySelector('canvas').getContext('2d');
+    charts[id] = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [{
+          label: key, data: [],
+          borderColor: color, backgroundColor: color + '22',
+          borderWidth: 2, pointRadius: 2, fill: true, tension: 0.3,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#8892a4', maxTicksLimit: 6, font: { size: 10 } }, grid: { color: '#2d3148' } },
+          y: { ticks: { color: '#8892a4', font: { size: 10 } }, grid: { color: '#2d3148' } },
+        }
+      }
+    });
+  }
+  const c = charts[id];
+  c.data.labels.push(new Date(timestamp).toLocaleTimeString('th-TH', { hour12: false }));
+  c.data.datasets[0].data.push(value);
+  if (c.data.labels.length > MAX_POINTS) { c.data.labels.shift(); c.data.datasets[0].data.shift(); }
+  c.update('none');
+}
+
+/* ═══════════════════════════════════════════════
+   FLATTEN PAYLOAD
+════════════════════════════════════════════════ */
+function flattenPayload(obj, prefix = '') {
+  if (typeof obj !== 'object' || obj === null) {
+    return [{ key: prefix || 'value', value: obj }];
+  }
+  const out = [];
+  for (const [k, v] of Object.entries(obj)) {
+    const key = prefix ? `${prefix}.${k}` : k;
+    if (typeof v === 'object' && v !== null && !Array.isArray(v)) {
+      out.push(...flattenPayload(v, key));
+    } else {
+      out.push({ key, value: v });
+    }
+  }
+  return out;
+}
+
+/* ═══════════════════════════════════════════════
+   FIELD LIST SIDEBAR
+════════════════════════════════════════════════ */
+function updateFieldList() {
+  const el = document.getElementById('field-list');
+  el.innerHTML = '';
+  for (const [id, val] of Object.entries(latestValues)) {
+    const key = id.split('::').slice(1).join('::');
+    const isImg = val === '[image]';
+    const row = document.createElement('div');
+    row.className = 'field-row';
+    row.innerHTML = `
+      <span class="field-name">${key}</span>
+      <span class="${isImg ? 'field-img' : 'field-val'}">${
+        isImg ? '📷 image' : (typeof val === 'number' ? formatNum(val) : String(val).substring(0, 18))
+      }</span>`;
+    el.appendChild(row);
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   LOG
+════════════════════════════════════════════════ */
+function addLog(topic, flat, timestamp, hasImage) {
+  const list = document.getElementById('log-list');
+  const row  = document.createElement('div');
+  row.className = 'log-row';
+  const t = new Date(timestamp).toLocaleTimeString('th-TH', { hour12: false });
+  const summary = flat.map(({ key, value }) => {
+    const du = extractDataUrl(key, value);
+    if (du) return `${key}: <img ~${approxKiB(du)}>`;
+    const v = typeof value === 'string'
+      ? `"${value.substring(0, 40)}${value.length > 40 ? '…' : ''}"`
+      : value;
+    return `${key}: ${v}`;
+  }).join(', ');
+  row.innerHTML = `
+    <span class="log-time">${t}</span>
+    <span class="log-topic">${topic}</span>
+    <span class="log-data ${hasImage ? 'log-img' : ''}">{${summary}}</span>`;
+  list.prepend(row);
+  if (list.children.length > MAX_LOG) list.lastElementChild?.remove();
+}
+
+/* ═══════════════════════════════════════════════
+   CLEAR
+════════════════════════════════════════════════ */
+document.getElementById('btn-clear').addEventListener('click', () => {
+  Object.values(charts).forEach(c => {
+    c.data.labels = []; c.data.datasets[0].data = []; c.update('none');
+  });
+  Object.values(imgStreams).forEach(st => {
+    st.frameCount = 0; st.lastTimes = [];
+    st.fpsBadge.textContent = '— FPS';
+    st.fcBadge.textContent  = '0 frames';
+  });
+  document.getElementById('log-list').innerHTML = '';
+  msgCount = 0;
+  document.getElementById('cnt').textContent = '0';
+});
+
+/* ═══════════════════════════════════════════════
+   DEEPDETECT JSON HANDLER
+════════════════════════════════════════════════ */
+function handleDeepDetect(topic, data) {
+  const dd  = data.payload.DeepDetect;
+  const st  = imgStreams[topic];
+
+  msgCount++;
+  document.getElementById('cnt').textContent = msgCount;
+  if (!seenTopics.has(topic)) {
+    seenTopics.add(topic);
+    const pill = document.createElement('div');
+    pill.className = 'topic-pill'; pill.textContent = topic;
+    document.getElementById('topic-list').appendChild(pill);
+  }
+
+  const growing = dd.counts?.Growing ?? 0;
+  const hole    = dd.counts?.Hole    ?? 0;
+  const tsStr   = data.datetime || new Date().toLocaleTimeString('th-TH');
+
+  latestValues[`${topic}::Growing`] = growing;
+  latestValues[`${topic}::Hole`]    = hole;
+
+  if (st) {
+    st.lastDetect = dd;
+    st.ddBar.classList.add('visible');
+    st.ddGrowing.textContent = `🌱 Growing: ${growing}`;
+    st.ddHole.textContent    = `🕳️ Hole: ${hole}`;
+    st.ddTs.textContent      = tsStr;
+    if (st.showOverlay) drawOverlay(st, dd);
+  }
+
+  updateFieldList();
+  addLog(topic, [
+    { key: 'Growing', value: growing },
+    { key: 'Hole',    value: hole },
+    { key: 'total',   value: dd.count },
+  ], Date.now(), false);
+}
+
+/* ─── Draw bounding box overlay ─── */
+function drawOverlay(st, dd) {
+  const img = st.mainImg;
+  if (!img.naturalWidth) return;
+
+  const canvas = st.overlay;
+  canvas.width  = img.naturalWidth;
+  canvas.height = img.naturalHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const scaleX = img.naturalWidth  / (dd.im_w || img.naturalWidth);
+  const scaleY = img.naturalHeight / (dd.im_h || img.naturalHeight);
+
+  (dd.objects || []).forEach(obj => {
+    const x = obj.x * scaleX;
+    const y = obj.y * scaleY;
+    const w = obj.w * scaleX;
+    const h = obj.h * scaleY;
+    const isGrow = obj.name === 'Growing';
+    const color  = isGrow ? '#00d4aa' : '#ff4f6a';
+    const pct    = (obj.confidence * 100).toFixed(0);
+
+    // กล่อง
+    ctx.strokeStyle = color;
+    ctx.lineWidth   = 2.5;
+    ctx.strokeRect(x, y, w, h);
+
+    // label bg
+    const label   = `${obj.name} ${pct}%`;
+    ctx.font       = 'bold 13px monospace';
+    const tw       = ctx.measureText(label).width + 8;
+    ctx.fillStyle  = color + 'cc';
+    ctx.fillRect(x, y - 20, tw, 20);
+
+    // label text
+    ctx.fillStyle = '#fff';
+    ctx.fillText(label, x + 4, y - 5);
+  });
+}
+
+/* ═══════════════════════════════════════════════
+   BUFFER → BASE64
+════════════════════════════════════════════════ */
+function bufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary  = '';
+  const chunk = 8192;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + chunk, bytes.length)));
+  }
+  return btoa(binary);
+}
+
+/* ─── Utils ─── */
+function formatNum(n) {
+  return Number.isInteger(n) ? n.toString() : parseFloat(n.toFixed(4)).toString();
+}
+</script>
+</body>
+</html>

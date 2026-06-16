@@ -1,0 +1,3026 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🌱 RAIL Smart Farm Dashboard</title>
+  <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <style>
+    :root {
+      --bg: #080f0a;
+      --bg2: #0d1a10;
+      --card: #0f1f13;
+      --card2: #142318;
+      --green: #00e676;
+      --green2: #00c853;
+      --blue: #29b6f6;
+      --orange: #ffa726;
+      --yellow: #ffee58;
+      --red: #ef5350;
+      --purple: #ab47bc;
+      --text: #e8f5e9;
+      --muted: #6a9a74;
+      --border: rgba(0,230,118,0.12);
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { background:var(--bg); color:var(--text); font-family:'Segoe UI',Tahoma,sans-serif; min-height:100vh; }
+
+    /* ══ LOGIN OVERLAY ══ */
+    #loginOverlay {
+      position:fixed; inset:0; z-index:9999;
+      display:flex; align-items:center; justify-content:center;
+      background:radial-gradient(ellipse at 50% 30%, #0d2b14 0%, #050d07 70%);
+      overflow:hidden;
+    }
+    #loginOverlay.hidden { display:none; }
+
+    /* Animated floating particles */
+    .lp-particles { position:absolute; inset:0; pointer-events:none; overflow:hidden; }
+    .lp-p {
+      position:absolute; border-radius:50%;
+      background:radial-gradient(circle, rgba(0,230,118,.35) 0%, transparent 70%);
+      animation:floatUp linear infinite;
+    }
+    @keyframes floatUp {
+      0%   { transform:translateY(100vh) scale(.5); opacity:0; }
+      10%  { opacity:1; }
+      90%  { opacity:.4; }
+      100% { transform:translateY(-15vh) scale(1.2); opacity:0; }
+    }
+    /* Decorative grid lines */
+    .lp-grid {
+      position:absolute; inset:0; pointer-events:none;
+      background-image:
+        linear-gradient(rgba(0,230,118,.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,230,118,.04) 1px, transparent 1px);
+      background-size:48px 48px;
+    }
+    /* Login card */
+    .lp-card {
+      position:relative; z-index:2;
+      width:min(420px, 92vw);
+      background:linear-gradient(145deg,#0c1f10,#081509);
+      border:1px solid rgba(0,230,118,.20);
+      border-radius:24px;
+      padding:44px 40px 40px;
+      box-shadow:0 0 60px rgba(0,230,118,.10), 0 24px 64px rgba(0,0,0,.6);
+      backdrop-filter:blur(2px);
+    }
+    /* Glowing top bar */
+    .lp-card::before {
+      content:'';
+      position:absolute; top:0; left:50%; transform:translateX(-50%);
+      width:60%; height:2px;
+      background:linear-gradient(90deg,transparent,var(--green),transparent);
+      border-radius:99px;
+    }
+    /* Logo area */
+    .lp-logo {
+      text-align:center; margin-bottom:32px;
+    }
+    .lp-logo-icon {
+      font-size:52px; display:block; margin-bottom:10px;
+      filter:drop-shadow(0 0 18px rgba(0,230,118,.7));
+      animation:pulseIcon 3s ease-in-out infinite;
+    }
+    @keyframes pulseIcon { 0%,100%{filter:drop-shadow(0 0 18px rgba(0,230,118,.7));} 50%{filter:drop-shadow(0 0 32px rgba(0,230,118,1));} }
+    .lp-logo h2 {
+      font-size:22px; font-weight:800; color:var(--green);
+      letter-spacing:.8px; text-shadow:0 0 24px rgba(0,230,118,.4);
+    }
+    .lp-logo p { font-size:12px; color:var(--muted); margin-top:4px; letter-spacing:.3px; }
+    /* Label */
+    .lp-label {
+      font-size:11px; font-weight:700; color:var(--muted);
+      text-transform:uppercase; letter-spacing:1.2px;
+      margin-bottom:7px; display:flex; align-items:center; gap:6px;
+    }
+    .lp-label i { font-size:10px; }
+    /* Input group */
+    .lp-group { margin-bottom:18px; }
+    .lp-input-wrap { position:relative; }
+    .lp-input {
+      width:100%; padding:13px 44px 13px 16px;
+      background:rgba(255,255,255,.04);
+      border:1px solid rgba(0,230,118,.18);
+      border-radius:12px;
+      color:var(--text); font-size:15px; font-family:inherit;
+      transition:border-color .25s, box-shadow .25s, background .25s;
+      outline:none;
+    }
+    .lp-input::placeholder { color:rgba(255,255,255,.22); }
+    .lp-input:focus {
+      border-color:var(--green);
+      background:rgba(0,230,118,.05);
+      box-shadow:0 0 0 3px rgba(0,230,118,.12);
+    }
+    .lp-input-icon {
+      position:absolute; right:14px; top:50%; transform:translateY(-50%);
+      color:rgba(255,255,255,.25); font-size:14px; pointer-events:none;
+    }
+    .lp-input:focus ~ .lp-input-icon { color:var(--green); }
+    /* Toggle password */
+    .lp-eye {
+      position:absolute; right:14px; top:50%; transform:translateY(-50%);
+      color:rgba(255,255,255,.25); font-size:14px;
+      cursor:pointer; background:none; border:none; padding:2px;
+      transition:color .2s;
+    }
+    .lp-eye:hover { color:var(--green); }
+    /* Error message */
+    /* Auth tabs */
+    .lp-tabs {
+      display:flex; gap:6px; margin-bottom:22px;
+      background:rgba(255,255,255,.04); border-radius:12px; padding:4px;
+    }
+    .lp-tab {
+      flex:1; padding:9px 0; border:none; border-radius:9px;
+      font-size:12.5px; font-weight:700; font-family:inherit;
+      cursor:pointer; transition:all .2s;
+      background:transparent; color:rgba(255,255,255,.4);
+      display:flex; align-items:center; justify-content:center; gap:6px;
+    }
+    .lp-tab.active {
+      background:rgba(0,230,118,.15); color:var(--green);
+      box-shadow:0 0 0 1px rgba(0,230,118,.3);
+    }
+    .lp-tab:hover:not(.active) { color:rgba(255,255,255,.7); }
+    /* Error / Success messages */
+    .lp-error {
+      display:none; align-items:center; gap:8px;
+      background:rgba(239,83,80,.12); border:1px solid rgba(239,83,80,.35);
+      border-radius:10px; padding:10px 14px;
+      font-size:12.5px; color:#ef9a9a; margin-bottom:18px;
+      animation:shakeX .4s ease;
+    }
+    .lp-error.show { display:flex; }
+    .lp-success {
+      align-items:center; gap:8px;
+      background:rgba(0,230,118,.12); border:1px solid rgba(0,230,118,.35);
+      border-radius:10px; padding:10px 14px;
+      font-size:12.5px; color:#69f0ae; margin-bottom:18px;
+    }
+    @keyframes shakeX {
+      0%,100%{transform:translateX(0);}
+      20%{transform:translateX(-8px);}
+      40%{transform:translateX(8px);}
+      60%{transform:translateX(-5px);}
+      80%{transform:translateX(5px);}
+    }
+    /* Login button */
+    .lp-btn {
+      width:100%; padding:14px;
+      background:linear-gradient(135deg,#00c853,#00e676);
+      border:none; border-radius:12px;
+      color:#071209; font-size:15px; font-weight:800;
+      font-family:inherit; letter-spacing:.5px;
+      cursor:pointer; transition:all .25s;
+      display:flex; align-items:center; justify-content:center; gap:9px;
+      box-shadow:0 4px 20px rgba(0,230,118,.30);
+    }
+    .lp-btn:hover:not(:disabled) {
+      transform:translateY(-2px);
+      box-shadow:0 8px 28px rgba(0,230,118,.45);
+    }
+    .lp-btn:active:not(:disabled) { transform:translateY(0); }
+    .lp-btn:disabled { opacity:.55; cursor:not-allowed; }
+    /* User badge (after login) */
+    .hdr-user-badge {
+      display:none; align-items:center; gap:8px;
+      background:rgba(0,230,118,.08); border:1px solid rgba(0,230,118,.25);
+      border-radius:20px; padding:5px 14px 5px 8px; font-size:12px; font-weight:600; color:var(--green);
+    }
+    .hdr-user-badge.show { display:flex; }
+    .hub-av {
+      width:26px; height:26px; border-radius:50%;
+      background:linear-gradient(135deg,#00c853,#00e676);
+      color:#071209; font-size:12px; font-weight:900;
+      display:flex; align-items:center; justify-content:center;
+    }
+    /* Logout button */
+    .lp-logout {
+      background:rgba(239,83,80,.08); border:1px solid rgba(239,83,80,.28);
+      color:#ef5350; border-radius:20px; padding:5px 14px;
+      font-size:11px; font-weight:700; cursor:pointer;
+      transition:all .2s; font-family:inherit;
+    }
+    .lp-logout:hover { background:rgba(239,83,80,.18); }
+    /* Bottom hint */
+    .lp-hint {
+      text-align:center; margin-top:20px;
+      font-size:11px; color:rgba(255,255,255,.2);
+      display:flex; align-items:center; justify-content:center; gap:6px;
+    }
+    /* Divider */
+    .lp-divider {
+      display:flex; align-items:center; gap:12px; margin-bottom:20px;
+    }
+    .lp-divider-line { flex:1; height:1px; background:rgba(0,230,118,.12); }
+    .lp-divider-txt { font-size:10px; color:var(--muted); white-space:nowrap; letter-spacing:.8px; }
+    /* Spinner */
+    .lp-spin { display:inline-block; width:16px; height:16px; border:2px solid rgba(7,18,9,.4); border-top-color:#071209; border-radius:50%; animation:spin .7s linear infinite; }
+    @keyframes spin { to{transform:rotate(360deg)} }
+
+    /* ── HEADER ── */
+    header {
+      background:linear-gradient(135deg,#071209,#0a1a0d);
+      border-bottom:1px solid var(--border);
+      padding:14px 28px;
+      display:flex; align-items:center; justify-content:space-between;
+      position:sticky; top:0; z-index:200;
+    }
+    .logo { display:flex; align-items:center; gap:12px; }
+    .logo-icon { font-size:26px; filter:drop-shadow(0 0 8px rgba(0,230,118,.6)); }
+    .logo h1 { font-size:18px; font-weight:700; color:var(--green); letter-spacing:.5px; text-shadow:0 0 20px rgba(0,230,118,.3); }
+    .logo p { font-size:11px; color:var(--muted); margin-top:1px; }
+    .hdr-right { display:flex; align-items:center; gap:20px; }
+    .mqtt-badge {
+      display:flex; align-items:center; gap:7px;
+      padding:5px 14px; border-radius:20px; font-size:12px; font-weight:600;
+      border:1px solid; transition:all .4s;
+    }
+    .mqtt-badge.ok { background:rgba(0,230,118,.08); border-color:var(--green); color:var(--green); }
+    .mqtt-badge.err { background:rgba(239,83,80,.08); border-color:var(--red); color:var(--red); }
+    .mqtt-badge.wait { background:rgba(255,167,38,.08); border-color:var(--orange); color:var(--orange); }
+    .dot { width:7px; height:7px; border-radius:50%; background:currentColor; }
+    .mqtt-badge.ok .dot { animation:blink 2s infinite; }
+    @keyframes blink { 0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(0,230,118,.5);} 50%{opacity:.6;box-shadow:0 0 0 5px rgba(0,230,118,0);} }
+    .last-upd { font-size:11px; color:var(--muted); }
+
+    /* ── MAIN ── */
+    main { padding:20px 28px; max-width:1600px; margin:0 auto; }
+
+    /* ── ALERTS ── */
+    #alertsBar { margin-bottom:14px; }
+    .alert {
+      display:flex; align-items:center; gap:10px;
+      padding:9px 14px; border-radius:10px; font-size:13px; margin-bottom:6px;
+    }
+    .alert.warn { background:rgba(255,167,38,.1); border:1px solid rgba(255,167,38,.35); color:var(--orange); }
+    .alert.info { background:rgba(41,182,246,.1); border:1px solid rgba(41,182,246,.35); color:var(--blue); }
+
+    /* ── SENSOR CARDS ── */
+    .sensor-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:18px; }
+    @media(max-width:1100px){ .sensor-grid{grid-template-columns:repeat(2,1fr);} }
+    @media(max-width:600px){ .sensor-grid{grid-template-columns:1fr;} }
+
+    .scard {
+      background:var(--card); border:1px solid var(--border);
+      border-radius:16px; padding:18px 20px; position:relative; overflow:hidden;
+      transition:transform .2s, box-shadow .2s;
+    }
+    .scard:hover { transform:translateY(-3px); box-shadow:0 10px 36px rgba(0,0,0,.4); }
+    .scard::after { content:''; position:absolute; top:0; left:0; right:0; height:3px; border-radius:16px 16px 0 0; }
+    .scard.hum::after  { background:linear-gradient(90deg,#29b6f6,#0277bd); }
+    .scard.temp::after { background:linear-gradient(90deg,#ef5350,#c62828); }
+    .scard.ldr1::after { background:linear-gradient(90deg,#ffa726,#e65100); }
+    .scard.ldr2::after { background:linear-gradient(90deg,#ffee58,#f9a825); }
+
+    .scard-bg-icon { position:absolute; right:16px; top:50%; transform:translateY(-50%); font-size:56px; opacity:.07; pointer-events:none; }
+    .scard-label { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:1.2px; }
+    .scard-name { font-size:13px; font-weight:600; color:var(--text); margin:4px 0 12px; }
+    .scard-val { display:flex; align-items:baseline; gap:5px; }
+    .scard-num { font-size:46px; font-weight:800; line-height:1; font-variant-numeric:tabular-nums; transition:color .5s; }
+    .scard-unit { font-size:16px; color:var(--muted); }
+    .scard.hum  .scard-num { color:var(--blue); }
+    .scard.temp .scard-num { color:var(--red); }
+    .scard.ldr1 .scard-num { color:var(--orange); }
+    .scard.ldr2 .scard-num { color:var(--yellow); }
+    .scard-meta { margin-top:10px; font-size:11px; color:var(--muted); display:flex; align-items:center; gap:6px; }
+    .up { color:var(--green); } .dn { color:var(--red); }
+
+    /* ── CHARTS ── */
+    .charts-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:14px; margin-bottom:18px; }
+    @media(max-width:900px){ .charts-grid{grid-template-columns:1fr;} }
+    .ccrd {
+      background:var(--card); border:1px solid var(--border);
+      border-radius:16px; padding:18px 20px;
+    }
+    .ccrd-hdr { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+    .ccrd-title { display:flex; align-items:center; gap:8px; font-size:14px; font-weight:600; }
+    .cdot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+    .ccrd-pts { font-size:11px; color:var(--muted); }
+    .chart-wrap { position:relative; height:190px; }
+
+    /* ── AI CHAT ── */
+    .ai-wrap {
+      background:var(--card);
+      border:1.5px solid rgba(0,230,118,.45);
+      border-radius:20px; overflow:hidden;
+      margin-bottom:22px;
+      box-shadow:0 0 0 1px rgba(0,230,118,.08), 0 0 32px rgba(0,230,118,.10), 0 4px 24px rgba(0,0,0,.35);
+      position:relative;
+    }
+    .ai-wrap::before {
+      content:''; position:absolute; inset:0; border-radius:20px; pointer-events:none;
+      background:linear-gradient(135deg,rgba(0,230,118,.04) 0%,transparent 60%);
+    }
+    .ai-hdr {
+      padding:16px 24px; border-bottom:1px solid rgba(0,230,118,.18);
+      display:flex; align-items:center; gap:16px;
+      background:linear-gradient(135deg,rgba(0,230,118,.10) 0%,rgba(41,182,246,.05) 100%);
+    }
+    .ai-avatar {
+      width:48px; height:48px; border-radius:14px; font-size:26px;
+      background:linear-gradient(135deg,rgba(0,230,118,.25),rgba(41,182,246,.25));
+      border:1.5px solid rgba(0,230,118,.5);
+      display:flex; align-items:center; justify-content:center;
+      box-shadow:0 0 14px rgba(0,230,118,.25);
+      animation:aiPulse 2.5s ease-in-out infinite;
+    }
+    @keyframes aiPulse {
+      0%,100%{ box-shadow:0 0 10px rgba(0,230,118,.2); }
+      50%    { box-shadow:0 0 22px rgba(0,230,118,.5); }
+    }
+    .ai-info h3 { font-size:16px; font-weight:800; color:var(--green); letter-spacing:.3px; }
+    .ai-info p  { font-size:11px; color:var(--muted); margin-top:3px; }
+    .ai-status  { margin-left:auto; font-size:11px; color:var(--green); opacity:.8; }
+
+    #chatBox {
+      height:320px; overflow-y:auto; padding:18px 20px;
+      display:flex; flex-direction:column; gap:14px;
+      scroll-behavior:smooth;
+    }
+    #chatBox::-webkit-scrollbar { width:4px; }
+    #chatBox::-webkit-scrollbar-track { background:transparent; }
+    #chatBox::-webkit-scrollbar-thumb { background:rgba(0,230,118,.3); border-radius:2px; }
+
+    .msg { display:flex; gap:10px; max-width:88%; }
+    .msg.user { align-self:flex-end; flex-direction:row-reverse; }
+    .msg-av {
+      width:30px; height:30px; border-radius:50%; flex-shrink:0;
+      display:flex; align-items:center; justify-content:center; font-size:14px;
+    }
+    .msg.ai .msg-av { background:rgba(0,230,118,.15); border:1px solid rgba(0,230,118,.3); }
+    .msg.user .msg-av { background:rgba(171,71,188,.2); border:1px solid rgba(171,71,188,.4); }
+    .msg-bub {
+      padding:10px 15px; border-radius:14px; font-size:13.5px; line-height:1.65;
+    }
+    .msg.ai .msg-bub {
+      background:rgba(0,230,118,.05); border:1px solid rgba(0,230,118,.15);
+      border-radius:4px 14px 14px 14px;
+    }
+    .msg.user .msg-bub {
+      background:rgba(171,71,188,.12); border:1px solid rgba(171,71,188,.25);
+      border-radius:14px 4px 14px 14px; text-align:right;
+    }
+    .typing-bub { display:flex; gap:5px; padding:10px 15px; }
+    .tdot {
+      width:7px; height:7px; background:var(--green); border-radius:50%;
+      animation:tdot 1.4s infinite; opacity:.5;
+    }
+    .tdot:nth-child(2){animation-delay:.2s;} .tdot:nth-child(3){animation-delay:.4s;}
+    @keyframes tdot { 0%,60%,100%{transform:translateY(0);opacity:.4;} 30%{transform:translateY(-7px);opacity:1;} }
+
+    .quick-row {
+      padding:10px 20px; display:flex; gap:8px; flex-wrap:wrap;
+      border-top:1px solid var(--border);
+    }
+    .qbtn {
+      padding:5px 13px; border-radius:20px; border:1px solid rgba(0,230,118,.2);
+      background:rgba(0,230,118,.04); color:var(--green); font-size:12px;
+      cursor:pointer; transition:all .2s; font-family:inherit;
+    }
+    .qbtn:hover { background:rgba(0,230,118,.14); border-color:var(--green); }
+
+    .chat-input-row {
+      padding:14px 20px; border-top:1px solid var(--border);
+      display:flex; gap:10px; align-items:center;
+    }
+    #chatInput {
+      flex:1; background:rgba(255,255,255,.04); border:1px solid var(--border);
+      border-radius:12px; padding:11px 15px; color:var(--text); font-size:13.5px;
+      font-family:inherit; transition:border-color .2s;
+    }
+    #chatInput:focus { outline:none; border-color:var(--green); background:rgba(0,230,118,.03); }
+    #chatInput::placeholder { color:var(--muted); }
+    #sendBtn {
+      width:42px; height:42px; border-radius:12px; border:none;
+      background:linear-gradient(135deg,var(--green),var(--green2));
+      color:#000; font-size:15px; cursor:pointer; transition:all .2s;
+      display:flex; align-items:center; justify-content:center;
+    }
+    #sendBtn:hover { transform:scale(1.06); box-shadow:0 4px 16px rgba(0,230,118,.4); }
+    #sendBtn:disabled { opacity:.45; cursor:not-allowed; transform:none; }
+
+    /* ── FOOTER NOTE ── */
+    .fnote {
+      margin-top:16px; padding:12px 18px; border-radius:10px;
+      background:rgba(41,182,246,.07); border:1px solid rgba(41,182,246,.2);
+      font-size:12px; color:var(--blue); line-height:1.7;
+    }
+    .fnote strong { color:#64b5f6; }
+
+    /* ── SOLAR TRACKER ── */
+    .solar-section {
+      margin-bottom:18px; border-radius:16px; overflow:hidden;
+      border:1px solid var(--border); background:#06101a;
+    }
+    .solar-hdr {
+      padding:10px 20px; font-size:11px; font-weight:700;
+      color:var(--muted); text-transform:uppercase; letter-spacing:1.3px;
+      display:flex; align-items:center; gap:8px;
+    }
+    #solarCanvas { display:block; width:100%; }
+    .solar-timebar {
+      background:rgba(0,0,0,.65); padding:7px 18px;
+      display:flex; align-items:center; gap:10px;
+      border-top:1px solid rgba(255,255,255,.06);
+    }
+    .stb-lbl { font-size:11px; color:#666; white-space:nowrap; }
+    .stb-track { flex:1; height:6px; background:rgba(255,255,255,.08); border-radius:3px; overflow:hidden; }
+    .stb-fill {
+      height:100%; border-radius:3px;
+      background:linear-gradient(90deg,#c62828,#ff8f00,#ffd600,#fff9c4);
+      transition:width .8s ease;
+    }
+    .stb-clock {
+      font-size:14px; font-weight:700; color:#FFD600;
+      white-space:nowrap; font-variant-numeric:tabular-nums; min-width:82px; text-align:right;
+    }
+    .solar-countdown {
+      padding:5px 18px 10px; font-size:13px; font-weight:700;
+      color:#FFD600; text-align:center; background:rgba(0,0,0,.55);
+      letter-spacing:.5px; text-shadow:0 0 8px rgba(255,200,0,.5);
+    }
+
+    /* ── HARVEST HERO CARDS ── */
+    .hist-hero-grid {
+      display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:18px;
+    }
+    @media(max-width:600px){ .hist-hero-grid{ grid-template-columns:1fr; } }
+    .hist-hero-card {
+      border-radius:18px; padding:28px 28px 22px;
+      display:flex; flex-direction:column; align-items:flex-start;
+      position:relative; overflow:hidden; border:1px solid transparent;
+      transition:transform .25s, box-shadow .25s;
+    }
+    .hist-hero-card:hover { transform:translateY(-3px); }
+    .hist-hero-card.harvest {
+      background:linear-gradient(135deg,#0b2414,#0d2e18);
+      border-color:rgba(0,230,118,.25);
+      box-shadow:0 0 40px rgba(0,230,118,.08);
+    }
+    .hist-hero-card.revenue {
+      background:linear-gradient(135deg,#1a1a08,#22250a);
+      border-color:rgba(255,238,88,.22);
+      box-shadow:0 0 40px rgba(255,238,88,.07);
+    }
+    /* Glow top bar */
+    .hist-hero-card.harvest::before { content:''; position:absolute; top:0; left:10%; right:10%; height:2px; background:linear-gradient(90deg,transparent,var(--green),transparent); border-radius:99px; }
+    .hist-hero-card.revenue::before { content:''; position:absolute; top:0; left:10%; right:10%; height:2px; background:linear-gradient(90deg,transparent,var(--yellow),transparent); border-radius:99px; }
+    /* Decorative large emoji bg */
+    .hist-hero-card::after { content:attr(data-bg); position:absolute; right:-10px; bottom:-20px; font-size:100px; opacity:.06; pointer-events:none; }
+    .hh-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:1px; margin-bottom:14px; }
+    .hist-hero-card.harvest .hh-label { color:var(--green); }
+    .hist-hero-card.revenue .hh-label { color:var(--yellow); }
+    .hh-value { font-size:52px; font-weight:900; line-height:1; margin-bottom:10px; }
+    .hist-hero-card.harvest .hh-value { color:#fff; text-shadow:0 0 28px rgba(0,230,118,.35); }
+    .hist-hero-card.revenue .hh-value { color:#fff; text-shadow:0 0 28px rgba(255,238,88,.30); }
+    .hh-sub { font-size:11px; color:var(--muted); }
+    .hh-loading { font-size:26px; color:var(--muted); }
+
+    /* ── RELAY MESSAGE LOG ── */
+    .relay-log-section { margin-bottom:18px; background:var(--card); border:1px solid var(--border); border-radius:16px; overflow:hidden; }
+    .relay-log-hdr { padding:10px 20px; background:var(--card2); border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+    .relay-log-hdr-title { font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:1px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .rl-sub-badge { display:flex; align-items:center; gap:5px; font-size:10px; font-weight:600; color:#78909C; }
+    .rl-sub-dot { width:6px; height:6px; border-radius:50%; background:#78909C; transition:background .4s; }
+    .rl-sub-dot.live { background:var(--blue); animation:blink 2s infinite; }
+    .relay-log-body { height:190px; overflow-y:auto; padding:4px 0; scroll-behavior:smooth; }
+    .relay-log-body::-webkit-scrollbar { width:4px; }
+    .relay-log-body::-webkit-scrollbar-track { background:transparent; }
+    .relay-log-body::-webkit-scrollbar-thumb { background:rgba(0,230,118,.2); border-radius:4px; }
+    .rl-empty { display:flex; align-items:center; justify-content:center; height:160px; gap:8px; color:var(--muted); font-size:12.5px; opacity:.6; }
+    .rl-entry { display:flex; align-items:center; gap:10px; padding:5px 18px; border-bottom:1px solid rgba(0,230,118,.04); transition:background .12s; font-family:'Consolas','Courier New',monospace; }
+    .rl-entry:hover { background:rgba(255,255,255,.025); }
+    .rl-entry:first-child { border-top:1px solid rgba(0,230,118,.06); }
+    .rl-time { font-size:10.5px; color:var(--muted); white-space:nowrap; min-width:78px; }
+    .rl-dir { font-size:10px; font-weight:800; padding:2px 8px; border-radius:6px; white-space:nowrap; min-width:54px; text-align:center; letter-spacing:.3px; }
+    .rl-dir.sent { background:rgba(0,230,118,.14); color:var(--green); border:1px solid rgba(0,230,118,.3); }
+    .rl-dir.recv { background:rgba(41,182,246,.14); color:var(--blue);  border:1px solid rgba(41,182,246,.3); }
+    .rl-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+    .rl-dot.on  { background:var(--green); box-shadow:0 0 6px rgba(0,230,118,.8); }
+    .rl-dot.off { background:var(--red); }
+    .rl-dot.unk { background:var(--muted); }
+    .rl-payload { font-size:12px; font-weight:700; color:var(--yellow); background:rgba(255,238,88,.08); padding:2px 9px; border-radius:6px; border:1px solid rgba(255,238,88,.2); letter-spacing:.5px; }
+    .rl-desc { font-size:11.5px; color:var(--text); font-family:'Segoe UI',sans-serif; opacity:.85; }
+    .rl-clear { padding:4px 12px; border-radius:8px; font-size:11px; font-weight:700; background:rgba(239,83,80,.08); border:1px solid rgba(239,83,80,.25); color:var(--red); cursor:pointer; font-family:inherit; transition:background .2s; }
+    .rl-clear:hover { background:rgba(239,83,80,.18); }
+
+    /* ── TAB NAVIGATION ── */
+    .tab-nav {
+      background:#060e08; border-bottom:1px solid var(--border);
+      padding:0 28px; display:flex; gap:0;
+      position:sticky; top:60px; z-index:190;
+    }
+    .tab-btn {
+      padding:11px 22px; background:none; border:none;
+      color:var(--muted); font-size:13px; font-weight:600;
+      font-family:inherit; cursor:pointer;
+      border-bottom:2.5px solid transparent; transition:all .22s;
+      display:flex; align-items:center; gap:8px;
+    }
+    .tab-btn:hover { color:var(--text); }
+    .tab-btn.active { color:var(--green); border-bottom-color:var(--green); }
+
+    /* ── HISTORY PAGE ── */
+    #pageHistory { padding:20px 28px; max-width:1600px; margin:0 auto; display:none; }
+    .hist-topbar {
+      display:flex; align-items:flex-start; justify-content:space-between;
+      flex-wrap:wrap; gap:14px; margin-bottom:16px;
+    }
+    .hist-topbar h2 { font-size:18px; font-weight:800; color:var(--green); margin-bottom:3px; }
+    .hist-topbar p  { font-size:11px; color:var(--muted); }
+    .hist-controls {
+      display:none; align-items:center; gap:10px; flex-wrap:wrap;
+    }
+    .hist-select {
+      background:var(--card2); border:1px solid var(--border); color:var(--text);
+      padding:7px 12px; border-radius:10px; font-size:12px; font-family:inherit; cursor:pointer;
+    }
+    .hist-btn {
+      padding:7px 14px; border-radius:10px; font-size:12px; font-weight:700;
+      font-family:inherit; cursor:pointer; transition:all .2s;
+      display:flex; align-items:center; gap:6px; border:1px solid;
+    }
+    .hist-btn-refresh { background:rgba(0,230,118,.08); border-color:rgba(0,230,118,.3); color:var(--green); }
+    .hist-btn-refresh:hover { background:rgba(0,230,118,.18); }
+    .hist-btn-auto { background:rgba(41,182,246,.08); border-color:rgba(41,182,246,.3); color:var(--blue); }
+    .hist-btn-auto:hover { background:rgba(41,182,246,.18); }
+    .hist-btn-auto.ar-on { background:rgba(41,182,246,.22); box-shadow:0 0 12px rgba(41,182,246,.25); }
+    .hist-auth-btn {
+      padding:10px 20px; background:linear-gradient(135deg,#1a73e8,#4285f4);
+      border:none; border-radius:12px; color:#fff;
+      font-size:14px; font-weight:700; font-family:inherit; cursor:pointer;
+      display:flex; align-items:center; gap:9px;
+      box-shadow:0 4px 16px rgba(66,133,244,.35); transition:all .22s;
+    }
+    .hist-auth-btn:hover { transform:translateY(-2px); box-shadow:0 8px 24px rgba(66,133,244,.45); }
+    .hist-last { font-size:11px; color:var(--muted); }
+    /* Status bar */
+    .hist-status {
+      padding:8px 16px; border-radius:10px; font-size:12px; font-weight:600;
+      margin-bottom:14px; display:flex; align-items:center; gap:8px;
+      background:var(--card2); border:1px solid var(--border); color:var(--muted);
+    }
+    .hist-status.ok   { color:var(--green); border-color:rgba(0,230,118,.3); background:rgba(0,230,118,.06); }
+    .hist-status.err  { color:var(--red);   border-color:rgba(239,83,80,.3);  background:rgba(239,83,80,.06); }
+    .hist-status.info { color:var(--blue);  border-color:rgba(41,182,246,.3); background:rgba(41,182,246,.06); }
+    .hist-status.warn { color:var(--orange);border-color:rgba(255,167,38,.3); background:rgba(255,167,38,.06); }
+    /* Loader */
+    .hist-loader {
+      display:none; align-items:center; justify-content:center; gap:14px;
+      padding:40px; color:var(--muted); font-size:14px;
+    }
+    .hist-spinner {
+      width:32px; height:32px; border:3px solid rgba(0,230,118,.2);
+      border-top-color:var(--green); border-radius:50%;
+      animation:spin .8s linear infinite;
+    }
+    /* Summary cards */
+    .hist-sum-grid {
+      display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:18px;
+    }
+    @media(max-width:900px){ .hist-sum-grid{ grid-template-columns:repeat(2,1fr); } }
+    @media(max-width:500px){ .hist-sum-grid{ grid-template-columns:1fr; } }
+    .hs-card {
+      background:var(--card); border:1px solid var(--border); border-radius:14px;
+      padding:16px; transition:border-color .3s;
+    }
+    .hs-icon { font-size:22px; margin-bottom:6px; }
+    .hs-name { font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.8px; margin-bottom:6px; }
+    .hs-last { font-size:22px; font-weight:800; color:var(--text); margin-bottom:8px; }
+    .hs-row  { display:flex; gap:8px; flex-wrap:wrap; }
+    .hs-avg,.hs-min,.hs-max {
+      font-size:10px; font-weight:600; padding:2px 8px; border-radius:8px;
+      background:rgba(255,255,255,.05); color:var(--muted);
+    }
+    /* Charts grid */
+    .hist-charts-grid {
+      display:grid; grid-template-columns:repeat(2,1fr); gap:14px;
+    }
+    @media(max-width:900px){ .hist-charts-grid{ grid-template-columns:1fr; } }
+    .hcrd {
+      background:var(--card); border:1px solid var(--border); border-radius:14px; overflow:hidden;
+    }
+    .hcrd-hdr {
+      padding:11px 16px; background:var(--card2);
+      border-bottom:1px solid var(--border);
+      display:flex; align-items:center; gap:8px;
+      font-size:12px; font-weight:700; color:var(--muted);
+    }
+    .hcrd-dot { width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+    .hcrd-wrap { height:220px; padding:10px 10px 4px; }
+    /* Auth overlay inside page */
+    .hist-auth-center {
+      display:flex; flex-direction:column; align-items:center; justify-content:center;
+      min-height:320px; gap:16px; text-align:center;
+    }
+    .hist-auth-center p { font-size:13px; color:var(--muted); max-width:380px; }
+
+    /* ── RELAY CONTROL ── */
+    .relay-section { margin-bottom:18px; background:var(--card); border:1px solid var(--border); border-radius:16px; overflow:hidden; }
+    .relay-hdr { padding:11px 20px; background:var(--card2); border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+    .relay-hdr-title { font-size:11px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:1px; display:flex; align-items:center; gap:8px; }
+    .relay-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; padding:18px 20px; }
+    @media(max-width:650px){ .relay-grid{ grid-template-columns:1fr; } }
+    .rcrd {
+      background:var(--card2); border:1.5px solid var(--border);
+      border-radius:14px; padding:22px 16px 18px; text-align:center;
+      transition:border-color .35s, box-shadow .35s; position:relative; overflow:hidden;
+    }
+    .rcrd::before {
+      content:''; position:absolute; top:0; left:10%; right:10%; height:2px;
+      background:linear-gradient(90deg,transparent,var(--green),transparent);
+      opacity:0; transition:opacity .35s; border-radius:99px;
+    }
+    .rcrd.rc-on { border-color:rgba(0,230,118,.5); box-shadow:0 0 28px rgba(0,230,118,.10); }
+    .rcrd.rc-on::before { opacity:1; }
+    .rc-icon { font-size:36px; display:block; margin-bottom:9px; transition:transform .35s, filter .35s; }
+    .rcrd.rc-on .rc-icon { transform:scale(1.12); filter:drop-shadow(0 0 12px rgba(0,230,118,.75)); }
+    .rc-name { font-size:13px; font-weight:700; color:var(--text); margin-bottom:8px; }
+    .rc-badge {
+      display:inline-flex; align-items:center; gap:5px;
+      font-size:11px; font-weight:700; letter-spacing:.6px;
+      padding:3px 11px; border-radius:12px; margin-bottom:16px;
+      background:rgba(239,83,80,.10); color:var(--red); border:1px solid rgba(239,83,80,.25);
+      transition:all .35s;
+    }
+    .rcrd.rc-on .rc-badge { background:rgba(0,230,118,.10); color:var(--green); border-color:rgba(0,230,118,.30); }
+    .rc-led { width:7px; height:7px; border-radius:50%; background:currentColor; flex-shrink:0; }
+    .rcrd.rc-on .rc-led { animation:blink 1.4s infinite; }
+    .rc-btns { display:flex; gap:8px; }
+    .rc-btn {
+      flex:1; padding:10px 0; border-radius:10px; font-size:13px; font-weight:700;
+      font-family:inherit; cursor:pointer; transition:all .22s;
+      display:flex; align-items:center; justify-content:center; gap:6px; border:1px solid transparent;
+    }
+    .rc-btn:disabled { opacity:.4; cursor:not-allowed; }
+    .rc-on-btn { background:rgba(0,230,118,.08); border-color:rgba(0,230,118,.28); color:var(--green); }
+    .rc-on-btn:hover:not(:disabled) { background:rgba(0,230,118,.18); }
+    .rc-on-btn.rc-sel { background:linear-gradient(135deg,#00c853,#00e676); color:#071209; border-color:transparent; box-shadow:0 4px 16px rgba(0,230,118,.38); }
+    .rc-off-btn { background:rgba(239,83,80,.08); border-color:rgba(239,83,80,.28); color:var(--red); }
+    .rc-off-btn:hover:not(:disabled) { background:rgba(239,83,80,.18); }
+    .rc-off-btn.rc-sel { background:linear-gradient(135deg,#b71c1c,#ef5350); color:#fff; border-color:transparent; box-shadow:0 4px 16px rgba(239,83,80,.32); }
+    /* Topic tag */
+    .rc-topic { font-size:10px; color:var(--muted); margin-top:10px; font-family:monospace; opacity:.7; }
+    /* Toast */
+    #relayToast {
+      position:fixed; bottom:26px; left:50%; transform:translateX(-50%) translateY(80px);
+      background:var(--card2); border:1px solid var(--green); border-radius:12px;
+      padding:11px 24px; color:var(--green); font-size:13px; font-weight:600;
+      z-index:8000; transition:transform .38s cubic-bezier(.34,1.56,.64,1), opacity .38s;
+      opacity:0; pointer-events:none; white-space:nowrap;
+      display:flex; align-items:center; gap:9px;
+      box-shadow:0 8px 36px rgba(0,0,0,.55);
+    }
+    #relayToast.rt-show { transform:translateX(-50%) translateY(0); opacity:1; }
+    #relayToast.rt-err { border-color:var(--red); color:var(--red); }
+
+    /* ══ CAMERA SECTION ══ */
+    .cam-section {
+      background:var(--card); border:1px solid var(--border);
+      border-radius:16px; overflow:hidden; margin:20px 0;
+    }
+    .cam-hdr {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:12px 18px; border-bottom:1px solid var(--border);
+      background:var(--card2);
+    }
+    .cam-hdr-left { display:flex; align-items:center; gap:10px; font-weight:600; font-size:14px; }
+    .cam-dot { width:8px; height:8px; border-radius:50%; background:var(--muted); flex-shrink:0; }
+    .cam-dot.live { background:var(--green); box-shadow:0 0 6px var(--green); animation:camPulse 1.4s ease-in-out infinite; }
+    .cam-dot.wait { background:#f39c12; animation:camPulse .8s ease-in-out infinite; }
+    @keyframes camPulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+    .cam-meta { font-size:11px; color:var(--muted); display:flex; gap:12px; }
+    .cam-body { background:#000; position:relative; min-height:200px; display:flex; align-items:center; justify-content:center; }
+    .cam-body img { width:100%; max-height:540px; object-fit:contain; display:block; }
+    .cam-placeholder { color:var(--muted); font-size:13px; display:flex; flex-direction:column; align-items:center; gap:8px; padding:40px; }
+    .cam-placeholder i { font-size:36px; opacity:.3; }
+    .cam-conn-bar {
+      display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+      padding:10px 18px; border-bottom:1px solid var(--border);
+      background:rgba(0,0,0,.25);
+    }
+    .cam-conn-bar input {
+      background:var(--bg); border:1px solid var(--border); color:var(--text);
+      border-radius:8px; padding:5px 10px; font-size:12px; outline:none;
+    }
+    .cam-conn-bar input:first-child { flex:1; min-width:200px; }
+    .cam-conn-bar input:nth-child(2) { width:120px; }
+    .cam-conn-bar input:focus { border-color:var(--green); }
+    .cam-conn-btn {
+      padding:5px 14px; border-radius:8px; font-size:12px; font-weight:600;
+      border:none; cursor:pointer; transition:.2s;
+    }
+    .cam-conn-btn.connect  { background:var(--green); color:#000; }
+    .cam-conn-btn.connect:hover { opacity:.85; }
+    .cam-conn-btn.disc     { background:#e74c3c; color:#fff; }
+    .cam-conn-btn.disc:hover { opacity:.85; }
+    .cam-conn-btn:disabled { opacity:.4; cursor:not-allowed; }
+    .cam-conn-status { font-size:11px; color:var(--muted); margin-left:4px; }
+
+    /* ══ HARVEST BUTTON SECTION ══ */
+    .harvest-section {
+      background:linear-gradient(135deg,#071a0a,#0a2210);
+      border:1px solid rgba(0,230,118,.18);
+      border-radius:20px; padding:28px 32px;
+      margin:20px 0; text-align:center; position:relative; overflow:hidden;
+    }
+    .harvest-section::before {
+      content:''; position:absolute; top:0; left:0; right:0; height:2px;
+      background:linear-gradient(90deg,transparent,#00e676,#ffee58,transparent);
+    }
+    .harvest-section-label {
+      font-size:11px; color:var(--muted); letter-spacing:.5px;
+      text-transform:uppercase; margin-bottom:16px; opacity:.8;
+    }
+    .harvest-main-btn {
+      background:linear-gradient(135deg,#1b5e20,#2e7d32,#43a047);
+      border:none; border-radius:16px; color:#fff;
+      font-size:19px; font-weight:700; padding:20px 56px;
+      cursor:pointer; letter-spacing:.5px;
+      box-shadow:0 8px 32px rgba(0,200,83,.38),0 0 0 1px rgba(0,230,118,.2);
+      transition:all .3s cubic-bezier(.34,1.56,.64,1);
+      display:inline-flex; align-items:center; gap:14px;
+    }
+    .harvest-main-btn:hover {
+      transform:translateY(-4px) scale(1.05);
+      box-shadow:0 16px 48px rgba(0,200,83,.55),0 0 0 2px rgba(0,230,118,.4);
+    }
+    .harvest-main-btn:active { transform:scale(.97); }
+    .hbtn-icon { font-size:28px; animation:leafSway 2.4s ease-in-out infinite; }
+    @keyframes leafSway {
+      0%,100% { transform:rotate(-10deg); } 50% { transform:rotate(10deg); }
+    }
+    .harvest-section-sub {
+      margin-top:12px; font-size:12px; color:var(--muted); opacity:.7;
+    }
+
+    /* ══ HARVEST CONFIRMATION MODAL ══ */
+    .hv-overlay {
+      position:fixed; inset:0; z-index:9000;
+      background:rgba(0,0,0,.78); backdrop-filter:blur(8px);
+      display:flex; align-items:center; justify-content:center;
+      opacity:0; pointer-events:none; transition:opacity .3s ease;
+    }
+    .hv-overlay.hv-show { opacity:1; pointer-events:all; }
+    .hv-modal {
+      background:linear-gradient(145deg,#0c2010,#071509);
+      border:1px solid rgba(0,230,118,.25); border-radius:24px;
+      padding:40px 44px; width:min(500px,92vw); text-align:center;
+      box-shadow:0 32px 80px rgba(0,0,0,.7),0 0 60px rgba(0,230,118,.08);
+      transform:scale(.9) translateY(20px);
+      transition:transform .38s cubic-bezier(.34,1.56,.64,1);
+      position:relative;
+    }
+    .hv-overlay.hv-show .hv-modal { transform:scale(1) translateY(0); }
+    .hv-modal-glow {
+      position:absolute; top:0; left:50%; transform:translateX(-50%);
+      width:60%; height:2px;
+      background:linear-gradient(90deg,transparent,#00e676,transparent);
+    }
+    .hv-plant-wrap {
+      font-size:72px; display:block; margin-bottom:10px;
+      animation:hvBounce 1.4s ease-in-out infinite alternate;
+    }
+    @keyframes hvBounce {
+      0%   { transform:translateY(0) scale(1); }
+      100% { transform:translateY(-10px) scale(1.07); }
+    }
+    .hv-title  { font-size:22px; font-weight:700; color:var(--text); margin-bottom:8px; }
+    .hv-subtitle { font-size:13px; color:var(--muted); margin-bottom:26px; line-height:1.7; }
+    .hv-data-box {
+      background:rgba(0,230,118,.05); border:1px solid rgba(0,230,118,.14);
+      border-radius:14px; padding:20px 24px; margin-bottom:28px; min-height:72px;
+      display:flex; align-items:center; justify-content:center;
+    }
+    .hv-data-loading { color:var(--muted); font-size:13px; display:flex; align-items:center; gap:10px; }
+    .hv-spin {
+      width:16px; height:16px; border:2px solid rgba(0,230,118,.25);
+      border-top-color:var(--green); border-radius:50%;
+      animation:spin .7s linear infinite; flex-shrink:0;
+    }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .hv-data-result { display:none; width:100%; }
+    .hv-data-row {
+      display:flex; align-items:center; justify-content:space-between; padding:9px 0;
+    }
+    .hv-data-row + .hv-data-row { border-top:1px solid rgba(0,230,118,.1); }
+    .hv-data-label { font-size:13px; color:var(--muted); }
+    .hv-data-val   { font-size:22px; font-weight:800; color:var(--green); }
+    .hv-data-val.price { color:var(--yellow); }
+    .hv-modal-btns { display:flex; gap:14px; justify-content:center; }
+    .hv-btn-cancel {
+      background:rgba(239,83,80,.1); border:1px solid rgba(239,83,80,.3);
+      color:var(--red); border-radius:12px; padding:13px 28px;
+      font-size:15px; font-weight:600; cursor:pointer; transition:all .2s;
+    }
+    .hv-btn-cancel:hover { background:rgba(239,83,80,.22); }
+    .hv-btn-confirm {
+      background:linear-gradient(135deg,#00c853,#00e676);
+      border:none; color:#071209; border-radius:12px;
+      padding:13px 36px; font-size:15px; font-weight:700; cursor:pointer;
+      transition:all .25s cubic-bezier(.34,1.56,.64,1);
+      display:flex; align-items:center; gap:8px;
+    }
+    .hv-btn-confirm:hover { transform:scale(1.06); box-shadow:0 8px 24px rgba(0,230,118,.45); }
+    .hv-btn-confirm:disabled { opacity:.45; cursor:not-allowed; transform:none; box-shadow:none; }
+
+    /* ══ HARVEST SUCCESS OVERLAY ══ */
+    .hv-success-overlay {
+      position:fixed; inset:0; z-index:9100;
+      background:rgba(0,0,0,.9); backdrop-filter:blur(14px);
+      display:flex; align-items:center; justify-content:center;
+      opacity:0; pointer-events:none; transition:opacity .4s ease;
+    }
+    .hv-success-overlay.hv-show { opacity:1; pointer-events:all; }
+    #hvConfettiCanvas { position:absolute; inset:0; pointer-events:none; z-index:1; }
+    .hv-success-card {
+      position:relative; z-index:2;
+      background:linear-gradient(145deg,#0c2010,#071509);
+      border:1px solid rgba(0,230,118,.3); border-radius:28px;
+      padding:48px 52px; width:min(540px,94vw); text-align:center;
+      box-shadow:0 40px 100px rgba(0,0,0,.85),0 0 80px rgba(0,230,118,.14);
+      animation:hvSuccessPop .6s cubic-bezier(.34,1.56,.64,1) forwards;
+    }
+    @keyframes hvSuccessPop {
+      0%   { transform:scale(.55); opacity:0; }
+      100% { transform:scale(1);   opacity:1; }
+    }
+    .hv-success-icon {
+      font-size:80px; display:block; margin-bottom:14px;
+      animation:hvIconPop .8s cubic-bezier(.34,1.56,.64,1) .25s both;
+    }
+    @keyframes hvIconPop {
+      0%   { transform:scale(.3) rotate(-20deg); opacity:0; }
+      100% { transform:scale(1)  rotate(0);      opacity:1; }
+    }
+    .hv-success-title {
+      font-size:28px; font-weight:800; color:var(--green);
+      margin-bottom:6px; text-shadow:0 0 40px rgba(0,230,118,.5);
+    }
+    .hv-success-sub { font-size:12px; color:var(--muted); margin-bottom:30px; }
+    .hv-success-nums {
+      display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:28px;
+    }
+    .hv-snum-card {
+      background:rgba(0,0,0,.3); border-radius:16px; padding:18px 12px;
+      border:1px solid rgba(0,230,118,.12);
+    }
+    .hv-snum-card.gold { border-color:rgba(255,238,88,.2); }
+    .hv-snum-label { font-size:11px; color:var(--muted); margin-bottom:8px; }
+    .hv-snum-value {
+      font-size:40px; font-weight:900; color:var(--green);
+      animation:fadeSlideUp .7s ease .55s both;
+    }
+    .hv-snum-value.gold { color:var(--yellow); }
+    @keyframes fadeSlideUp {
+      0%   { transform:translateY(18px); opacity:0; }
+      100% { transform:translateY(0);    opacity:1; }
+    }
+    .hv-snum-unit { font-size:13px; color:var(--muted); margin-top:4px; }
+    .hv-success-summary {
+      background:rgba(0,230,118,.07); border:1px solid rgba(0,230,118,.18);
+      border-radius:12px; padding:14px 20px; font-size:16px;
+      color:var(--text); font-weight:600; margin-bottom:28px;
+      animation:fadeSlideUp .5s ease .85s both;
+    }
+    .hv-sum-green { color:var(--green); font-size:20px; }
+    .hv-sum-gold  { color:var(--yellow); font-size:20px; }
+    .hv-success-actions {
+      display:flex; gap:12px; justify-content:center;
+      flex-wrap:wrap;
+      animation:fadeSlideUp .5s ease 1.05s both;
+    }
+    .hv-sheet-btn {
+      background:linear-gradient(135deg,#1565c0,#1976d2);
+      border:none; border-radius:12px; color:#fff;
+      font-size:14px; font-weight:600; padding:13px 24px; cursor:pointer;
+      display:flex; align-items:center; gap:8px; text-decoration:none;
+      transition:all .2s;
+    }
+    .hv-sheet-btn:hover { transform:translateY(-2px); box-shadow:0 8px 24px rgba(21,101,192,.45); }
+    .hv-close-btn {
+      background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.15);
+      border-radius:12px; color:var(--text); font-size:14px; font-weight:600;
+      padding:13px 24px; cursor:pointer; transition:all .2s;
+    }
+    .hv-close-btn:hover { background:rgba(255,255,255,.14); }
+    .hv-success-ts { font-size:11px; color:var(--muted); margin-top:18px; opacity:.65; }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════ LOGIN OVERLAY ═══════════════ -->
+<div id="loginOverlay">
+  <div class="lp-grid"></div>
+  <div class="lp-particles" id="lpParticles"></div>
+
+  <div class="lp-card">
+    <div class="lp-logo">
+      <span class="lp-logo-icon">🌱</span>
+      <h2>RAIL Smart Farm</h2>
+      <p>โรงเรือนอัจฉริยะ · EAIP KLS · ระบบตรวจสอบเซ็นเซอร์</p>
+    </div>
+
+    <!-- Tab buttons -->
+    <div class="lp-tabs">
+      <button class="lp-tab active" id="tabLogin"    onclick="switchAuthTab('login')">
+        <i class="fas fa-right-to-bracket"></i> เข้าสู่ระบบ
+      </button>
+      <button class="lp-tab"        id="tabRegister" onclick="switchAuthTab('register')">
+        <i class="fas fa-user-plus"></i> สมัครสมาชิก
+      </button>
+    </div>
+
+    <!-- ══ LOGIN FORM ══ -->
+    <div id="formLogin">
+      <div class="lp-group">
+        <div class="lp-label"><i class="fas fa-user"></i> ชื่อผู้ใช้งาน</div>
+        <div class="lp-input-wrap">
+          <input id="lpUser" class="lp-input" type="text" placeholder="กรอกชื่อผู้ใช้..." autocomplete="username" spellcheck="false">
+          <span class="lp-input-icon"><i class="fas fa-user"></i></span>
+        </div>
+      </div>
+      <div class="lp-group">
+        <div class="lp-label"><i class="fas fa-key"></i> รหัสผ่าน</div>
+        <div class="lp-input-wrap">
+          <input id="lpPass" class="lp-input" type="password" placeholder="กรอกรหัสผ่าน..." autocomplete="current-password"
+                 onkeydown="if(event.key==='Enter')doLogin()">
+          <button class="lp-eye" type="button" tabindex="-1" onclick="togglePass()">
+            <i class="fas fa-eye" id="lpEyeIcon"></i>
+          </button>
+        </div>
+      </div>
+      <div class="lp-error" id="lpError">
+        <i class="fas fa-circle-exclamation"></i>
+        <span id="lpErrorMsg"></span>
+      </div>
+      <button class="lp-btn" id="lpBtn" onclick="doLogin()">
+        <i class="fas fa-right-to-bracket"></i> เข้าสู่ระบบ
+      </button>
+    </div>
+
+    <!-- ══ REGISTER FORM ══ -->
+    <div id="formRegister" style="display:none">
+      <div class="lp-group">
+        <div class="lp-label"><i class="fas fa-user"></i> ชื่อผู้ใช้ (a-z, 0-9, _)</div>
+        <div class="lp-input-wrap">
+          <input id="rgUser" class="lp-input" type="text" placeholder="เช่น farm_user01" spellcheck="false">
+          <span class="lp-input-icon"><i class="fas fa-user"></i></span>
+        </div>
+      </div>
+      <div class="lp-group">
+        <div class="lp-label"><i class="fas fa-envelope"></i> Email</div>
+        <div class="lp-input-wrap">
+          <input id="rgEmail" class="lp-input" type="email" placeholder="example@email.com">
+          <span class="lp-input-icon"><i class="fas fa-envelope"></i></span>
+        </div>
+      </div>
+      <div class="lp-group">
+        <div class="lp-label"><i class="fas fa-key"></i> รหัสผ่าน (อย่างน้อย 6 ตัว)</div>
+        <div class="lp-input-wrap">
+          <input id="rgPass" class="lp-input" type="password" placeholder="กรอกรหัสผ่าน...">
+          <span class="lp-input-icon"><i class="fas fa-key"></i></span>
+        </div>
+      </div>
+      <div class="lp-group">
+        <div class="lp-label"><i class="fas fa-check-double"></i> ยืนยันรหัสผ่าน</div>
+        <div class="lp-input-wrap">
+          <input id="rgConfirm" class="lp-input" type="password" placeholder="กรอกรหัสผ่านอีกครั้ง..."
+                 onkeydown="if(event.key==='Enter')doRegister()">
+          <span class="lp-input-icon"><i class="fas fa-check"></i></span>
+        </div>
+      </div>
+      <div class="lp-error" id="rgError">
+        <i class="fas fa-circle-exclamation"></i>
+        <span id="rgErrorMsg"></span>
+      </div>
+      <div class="lp-success" id="rgSuccess" style="display:none">
+        <i class="fas fa-circle-check"></i>
+        <span id="rgSuccessMsg"></span>
+      </div>
+      <button class="lp-btn" id="rgBtn" onclick="doRegister()">
+        <i class="fas fa-user-plus"></i> สมัครสมาชิก
+      </button>
+    </div>
+
+    <div class="lp-hint">
+      <i class="fas fa-shield-halved"></i>
+      ระบบนี้สงวนไว้สำหรับผู้ได้รับอนุญาตเท่านั้น
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ HEADER ═══════════════ -->
+<header>
+  <div class="logo">
+    <span class="logo-icon">🌱</span>
+    <div>
+      <h1>RAIL Smart Farm Dashboard</h1>
+      <p>โรงเรือนอัจฉริยะ · RAIL KLS · real-time sensor monitor</p>
+    </div>
+  </div>
+  <div class="hdr-right">
+    <div class="hdr-user-badge" id="hdrUserBadge">
+      <div class="hub-av" id="hdrUserAv">?</div>
+      <span id="hdrUserName">ผู้ใช้</span>
+    </div>
+    <div id="mqttBadge" class="mqtt-badge wait">
+      <span class="dot"></span>
+      <span id="mqttLabel">MQTT: กำลังเชื่อมต่อ...</span>
+    </div>
+    <div class="last-upd">อัปเดต: <span id="lastUpd">-</span></div>
+    <button class="lp-logout" id="logoutBtn" onclick="doLogout()" style="display:none">
+      <i class="fas fa-right-from-bracket"></i> ออกจากระบบ
+    </button>
+  </div>
+</header>
+
+<!-- ═══════════════ TAB NAV ═══════════════ -->
+<nav class="tab-nav">
+  <button class="tab-btn active" id="tab-main"    onclick="switchTab('main')">
+    <i class="fas fa-gauge-high"></i> Dashboard หลัก
+  </button>
+  <button class="tab-btn"        id="tab-history" onclick="switchTab('history')">
+    <i class="fas fa-chart-line"></i> ประวัติข้อมูล
+  </button>
+</nav>
+
+<!-- ═══════════════ MAIN ═══════════════ -->
+<main id="pageDash">
+  <div id="alertsBar"></div>
+
+  <!-- ═══ Farm AI Assistant (top) ═══ -->
+  <div class="ai-wrap">
+    <div class="ai-hdr">
+      <div class="ai-avatar">🤖</div>
+      <div class="ai-info">
+        <h3>Farm AI Assistant</h3>
+        <p>วิเคราะห์สภาพโรงเรือน · ทำนายแนวโน้ม · แนะนำการเก็บเกี่ยว</p>
+      </div>
+      <div class="ai-status" id="aiStatus">เชื่อมต่อกับ n8n</div>
+    </div>
+
+    <div id="chatBox">
+      <div class="msg ai">
+        <div class="msg-av">🌱</div>
+        <div class="msg-bub">
+          สวัสดีครับ! ผมคือ Farm AI Assistant 🌿<br>
+          ผมสามารถวิเคราะห์ข้อมูลจากเซ็นเซอร์ในโรงเรือนของคุณได้แบบ real-time และดึงข้อมูลประวัติจาก Google Sheets มาประกอบการวิเคราะห์ด้วยครับ<br><br>
+          ลองถามได้เลยครับ เช่น "ตอนนี้ฟาร์มเป็นยังไง?" หรือ "พืชพร้อมเก็บเกี่ยวไหม?" 🌾
+        </div>
+      </div>
+    </div>
+
+    <div class="quick-row">
+      <button class="qbtn" onclick="ask('ตอนนี้สภาพโรงเรือนเป็นยังไงบ้างครับ?')">🌡️ สภาพโรงเรือนตอนนี้</button>
+      <button class="qbtn" onclick="ask('พืชพร้อมเก็บเกี่ยวหรือยังครับ?')">🌾 พร้อมเก็บเกี่ยวไหม?</button>
+      <button class="qbtn" onclick="ask('ความชื้นและอุณหภูมิตอนนี้เหมาะสมกับการเพาะปลูกไหม?')">💧 ค่าเหมาะสมไหม?</button>
+      <button class="qbtn" onclick="ask('แนวโน้มค่าเซ็นเซอร์จากข้อมูลที่ผ่านมาเป็นอย่างไรครับ?')">📈 แนวโน้มจากประวัติ</button>
+      <button class="qbtn" onclick="ask('ควรปรับอะไรในโรงเรือนบ้างไหมตอนนี้?')">⚙️ ควรปรับอะไรไหม?</button>
+    </div>
+
+    <div class="chat-input-row">
+      <input id="chatInput" type="text"
+        placeholder="ถามเกี่ยวกับโรงเรือน เช่น 'ค่าแสงตอนนี้เพียงพอสำหรับพืชไหม?'"
+        onkeydown="if(event.key==='Enter')sendMsg()">
+      <button id="sendBtn" onclick="sendMsg()"><i class="fas fa-paper-plane"></i></button>
+    </div>
+  </div>
+
+  <!-- Sensor Cards -->
+  <div class="sensor-grid">
+    <div class="scard hum">
+      <i class="fas fa-droplet scard-bg-icon"></i>
+      <div class="scard-label">ความชื้น · Rail_Hum09</div>
+      <div class="scard-name">Humidity</div>
+      <div class="scard-val"><span class="scard-num" id="v-hum">--</span><span class="scard-unit">%</span></div>
+      <div class="scard-meta"><i id="ti-hum" class="fas fa-minus"></i><span id="tm-hum">รอข้อมูล...</span></div>
+    </div>
+    <div class="scard temp">
+      <i class="fas fa-temperature-three-quarters scard-bg-icon"></i>
+      <div class="scard-label">อุณหภูมิ · Rail_Temp09</div>
+      <div class="scard-name">Temperature</div>
+      <div class="scard-val"><span class="scard-num" id="v-temp">--</span><span class="scard-unit">°C</span></div>
+      <div class="scard-meta"><i id="ti-temp" class="fas fa-minus"></i><span id="tm-temp">รอข้อมูล...</span></div>
+    </div>
+    <div class="scard ldr1">
+      <i class="fas fa-sun scard-bg-icon"></i>
+      <div class="scard-label">แสง 1 · 2RAIL_LDR1</div>
+      <div class="scard-name">Light Sensor 1</div>
+      <div class="scard-val"><span class="scard-num" id="v-ldr1">--</span><span class="scard-unit">lux</span></div>
+      <div class="scard-meta"><i id="ti-ldr1" class="fas fa-minus"></i><span id="tm-ldr1">รอข้อมูล...</span></div>
+    </div>
+    <div class="scard ldr2">
+      <i class="fas fa-sun scard-bg-icon" style="color:#ffee58"></i>
+      <div class="scard-label">แสง 2 · 2RAIL_LDR2</div>
+      <div class="scard-name">Light Sensor 2</div>
+      <div class="scard-val"><span class="scard-num" id="v-ldr2">--</span><span class="scard-unit">lux</span></div>
+      <div class="scard-meta"><i id="ti-ldr2" class="fas fa-minus"></i><span id="tm-ldr2">รอข้อมูล...</span></div>
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="charts-grid">
+    <div class="ccrd">
+      <div class="ccrd-hdr">
+        <div class="ccrd-title"><span class="cdot" style="background:#29b6f6"></span>ความชื้น (Humidity %)</div>
+        <span class="ccrd-pts">50 จุดล่าสุด</span>
+      </div>
+      <div class="chart-wrap"><canvas id="ch-hum"></canvas></div>
+    </div>
+    <div class="ccrd">
+      <div class="ccrd-hdr">
+        <div class="ccrd-title"><span class="cdot" style="background:#ef5350"></span>อุณหภูมิ (Temperature °C)</div>
+        <span class="ccrd-pts">50 จุดล่าสุด</span>
+      </div>
+      <div class="chart-wrap"><canvas id="ch-temp"></canvas></div>
+    </div>
+    <div class="ccrd">
+      <div class="ccrd-hdr">
+        <div class="ccrd-title"><span class="cdot" style="background:#ffa726"></span>แสง 1 (LDR1 lux)</div>
+        <span class="ccrd-pts">50 จุดล่าสุด</span>
+      </div>
+      <div class="chart-wrap"><canvas id="ch-ldr1"></canvas></div>
+    </div>
+    <div class="ccrd">
+      <div class="ccrd-hdr">
+        <div class="ccrd-title"><span class="cdot" style="background:#ffee58"></span>แสง 2 (LDR2 lux)</div>
+        <span class="ccrd-pts">50 จุดล่าสุด</span>
+      </div>
+      <div class="chart-wrap"><canvas id="ch-ldr2"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ═══ Solar Tracker Animation ═══ -->
+  <div class="solar-section">
+    <div class="solar-hdr">☀️ Solar Tracker — โซลาร์เซลล์ติดตามแสงอาทิตย์แบบ Real-Time</div>
+    <canvas id="solarCanvas" height="320"></canvas>
+    <div class="solar-timebar">
+      <span class="stb-lbl">🌅 06:00</span>
+      <div class="stb-track"><div class="stb-fill" id="solarProgress" style="width:0%"></div></div>
+      <span class="stb-lbl">🌇 18:00</span>
+      <span class="stb-clock" id="solarClock">--:--:--</span>
+    </div>
+    <div class="solar-countdown" id="solarCountdown">กำลังคำนวณ...</div>
+  </div>
+
+  <!-- ═══ Camera — Rail-IMG07 ═══ -->
+  <div class="cam-section">
+    <div class="cam-hdr">
+      <div class="cam-hdr-left">
+        <div class="cam-dot" id="camDot"></div>
+        <span>📷 กล้อง Live — Rail-IMG07</span>
+      </div>
+      <div class="cam-meta">
+        <span id="camFps">— FPS</span>
+        <span id="camTime">—</span>
+        <span id="camFrames">0 frames</span>
+      </div>
+    </div>
+    <!-- mini connection panel -->
+    <div class="cam-conn-bar">
+      <input id="camBrokerUrl" type="text" value="wss://rail.kls.ac.th:9002" placeholder="Broker URL (WebSocket)">
+      <input id="camTopic" type="text" value="Rail-IMG07" placeholder="Topic">
+      <button class="cam-conn-btn connect" id="camConnBtn" onclick="camConnect()">🔗 Connect</button>
+      <button class="cam-conn-btn disc"    id="camDiscBtn" onclick="camDisconnect()" disabled>✕ Disconnect</button>
+      <span id="camConnStatus" class="cam-conn-status">ยังไม่ได้เชื่อมต่อ</span>
+    </div>
+    <div class="cam-body" id="camBody">
+      <div class="cam-placeholder" id="camPlaceholder">
+        <i class="fas fa-camera"></i>
+        <span>กด Connect เพื่อรับภาพ...</span>
+      </div>
+      <img id="camImg" src="" alt="" style="display:none">
+    </div>
+  </div>
+
+  <!-- ═══ Relay Control Panel ═══ -->
+  <div class="relay-section">
+    <div class="relay-hdr">
+      <div class="relay-hdr-title">
+        <i class="fas fa-plug-circle-bolt"></i>&nbsp;Relay Control — ควบคุมรีเลย์ผ่าน MQTT
+      </div>
+      <div style="font-size:11px;color:var(--muted)">ส่งคำสั่ง Real-Time · QoS 0</div>
+    </div>
+    <div class="relay-grid">
+
+      <!-- ── Relay 1 ── -->
+      <div class="rcrd" id="rcrd1">
+        <span class="rc-icon">🌀</span>
+        <div class="rc-name">Relay ช่อง 1</div>
+        <div class="rc-badge" id="rcBadge1"><span class="rc-led"></span><span id="rcTxt1">ปิดอยู่</span></div>
+        <div class="rc-btns">
+          <button class="rc-btn rc-on-btn"  id="rcOn1"  onclick="relayCtrl('A','ON',1)"><i class="fas fa-power-off"></i> เปิด</button>
+          <button class="rc-btn rc-off-btn rc-sel" id="rcOff1" onclick="relayCtrl('A','OFF',1)"><i class="fas fa-xmark"></i> ปิด</button>
+        </div>
+        <div class="rc-topic">Rail-SM09 → AON / AOFF</div>
+      </div>
+
+      <!-- ── Relay 2 ── -->
+      <div class="rcrd" id="rcrd2">
+        <span class="rc-icon">💡</span>
+        <div class="rc-name">Relay ช่อง 2</div>
+        <div class="rc-badge" id="rcBadge2"><span class="rc-led"></span><span id="rcTxt2">ปิดอยู่</span></div>
+        <div class="rc-btns">
+          <button class="rc-btn rc-on-btn"  id="rcOn2"  onclick="relayCtrl('B','ON',2)"><i class="fas fa-power-off"></i> เปิด</button>
+          <button class="rc-btn rc-off-btn rc-sel" id="rcOff2" onclick="relayCtrl('B','OFF',2)"><i class="fas fa-xmark"></i> ปิด</button>
+        </div>
+        <div class="rc-topic">Rail-SM09 → BON / BOFF</div>
+      </div>
+
+      <!-- ── Relay 3 ── -->
+      <div class="rcrd" id="rcrd3">
+        <span class="rc-icon">💧</span>
+        <div class="rc-name">Relay ช่อง 3</div>
+        <div class="rc-badge" id="rcBadge3"><span class="rc-led"></span><span id="rcTxt3">ปิดอยู่</span></div>
+        <div class="rc-btns">
+          <button class="rc-btn rc-on-btn"  id="rcOn3"  onclick="relayCtrl('C','ON',3)"><i class="fas fa-power-off"></i> เปิด</button>
+          <button class="rc-btn rc-off-btn rc-sel" id="rcOff3" onclick="relayCtrl('C','OFF',3)"><i class="fas fa-xmark"></i> ปิด</button>
+        </div>
+        <div class="rc-topic">Rail-SM09 → CON / COFF</div>
+      </div>
+
+    </div>
+  </div>
+  <div id="relayToast"></div>
+
+  <!-- ═══ Relay Message Log ═══ -->
+  <div class="relay-log-section">
+    <div class="relay-log-hdr">
+      <div class="relay-log-hdr-title">
+        <i class="fas fa-terminal"></i>&nbsp;Message Log — Rail-SM09
+        <span class="rl-sub-badge">
+          <span class="rl-sub-dot" id="rlSubDot"></span>
+          <span id="rlSubStatus">รอการเชื่อมต่อ MQTT...</span>
+        </span>
+      </div>
+      <div style="display:flex;gap:10px;align-items:center">
+        <span style="font-size:10px;color:var(--muted)" id="rlCount">0 ข้อความ</span>
+        <button class="rl-clear" onclick="clearRelayLog()"><i class="fas fa-trash-can"></i> ล้าง</button>
+      </div>
+    </div>
+    <div class="relay-log-body" id="relayLogBody">
+      <div class="rl-empty" id="rlEmpty">
+        <i class="fas fa-satellite-dish" style="opacity:.5"></i>
+        รอรับข้อความจาก Rail-SM09...
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ Harvest Button ═══ -->
+  <div class="harvest-section">
+    <div class="harvest-section-label"><i class="fas fa-wheat-awn"></i>&nbsp; ระบบเก็บเกี่ยวผลผลิต</div>
+    <button class="harvest-main-btn" onclick="openHarvestModal()">
+      <span class="hbtn-icon">🌾</span>
+      เก็บเกี่ยวผลผลิต
+    </button>
+    <div class="harvest-section-sub">
+      กดเพื่อดูสรุปผลผลิตจากชีต "ข้อมูลผลผลิต" และยืนยันการเก็บเกี่ยว
+    </div>
+  </div>
+
+  <div class="fnote">
+    <strong>📌 วิธีใช้งาน:</strong>
+    หน้านี้จะเชื่อมต่อ MQTT broker โดยอัตโนมัติและแสดงค่าเซ็นเซอร์แบบ real-time ·
+    ช่อง AI Chat ต้องการให้ <strong>n8n ทำงานอยู่ที่ localhost:5678</strong> และ Workflow 2 (AI Chat) ถูก <strong>Activate</strong> แล้ว ·
+    หากต้องการแก้ URL broker หรือ n8n ให้แก้ใน <strong>CONFIG</strong> ด้านล่างของไฟล์ HTML นี้ครับ
+  </div>
+</main>
+
+<!-- ═══════════════ HISTORY PAGE ═══════════════ -->
+<div id="pageHistory">
+  <div class="hist-topbar">
+    <div>
+      <h2><i class="fas fa-chart-line" style="margin-right:8px;opacity:.8"></i>ประวัติข้อมูล — Google Sheets</h2>
+      <p>ชีต: ข้อมูลที่ได้รับจาก Ss · Spreadsheet ID: 1ig9cydMtWy1bOYgHv2XTpYtB9WyC9zFN-aXouQUhfGo</p>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <!-- Controls (shown after auth) -->
+      <div class="hist-controls" id="histControls">
+        <select class="hist-select" id="histFilter" onchange="fetchSheetData()">
+          <option value="all">ข้อมูลทั้งหมด</option>
+          <option value="30d">30 วันล่าสุด</option>
+          <option value="7d" selected>7 วันล่าสุด</option>
+          <option value="1d">24 ชม. ล่าสุด</option>
+        </select>
+        <button class="hist-btn hist-btn-refresh" onclick="fetchSheetData();fetchHarvestStats()">
+          <i class="fas fa-rotate"></i> รีเฟรช
+        </button>
+        <button class="hist-btn hist-btn-auto" id="autoRefBtn" onclick="toggleAutoRefresh()">
+          <i class="fas fa-clock"></i> Auto 5 นาที
+        </button>
+        <span class="hist-last">อัปเดต: <span id="histLastUpd">—</span></span>
+      </div>
+      <!-- Auth button (shown before auth) -->
+      <button class="hist-auth-btn" id="histAuthBtn" onclick="connectGoogle()">
+        <i class="fab fa-google"></i> เชื่อมต่อ Google Sheets
+      </button>
+    </div>
+  </div>
+
+  <!-- Status bar -->
+  <div class="hist-status" id="histStatus">
+    <i class="fas fa-circle-info"></i>
+    กดปุ่ม "เชื่อมต่อ Google Sheets" เพื่อเริ่มต้นดึงข้อมูล
+  </div>
+
+  <!-- Loading -->
+  <div class="hist-loader" id="histLoader">
+    <div class="hist-spinner"></div>
+    <span>กำลังดึงข้อมูลจาก Google Sheets...</span>
+  </div>
+
+  <!-- ── Hero KPI Cards (harvest + revenue) ── -->
+  <div class="hist-hero-grid" id="histHeroGrid" style="display:none">
+    <div class="hist-hero-card harvest" data-bg="🌱">
+      <div class="hh-label"><i class="fas fa-seedling"></i>&nbsp; สรุปต้นที่เก็บเกี่ยวแล้วทั้งหมด</div>
+      <div class="hh-value" id="heroHarvest"><span class="hh-loading">—</span></div>
+      <div class="hh-sub">จากชีต สรุปข้อมูลแบบเฉลี่ย · อัปเดต <span id="heroHarvestTs">—</span></div>
+    </div>
+    <div class="hist-hero-card revenue" data-bg="💵">
+      <div class="hh-label"><i class="fas fa-coins"></i>&nbsp; รวมราคาที่หากสามารถจำหน่ายได้</div>
+      <div class="hh-value" id="heroRevenue"><span class="hh-loading">—</span></div>
+      <div class="hh-sub">จากชีต สรุปข้อมูลแบบเฉลี่ย · อัปเดต <span id="heroRevenueTs">—</span></div>
+    </div>
+  </div>
+
+  <!-- Summary Cards -->
+  <div class="hist-sum-grid">
+    <div class="hs-card" id="sumTemp">
+      <div class="hs-icon">🌡️</div>
+      <div class="hs-name">Temperature</div>
+      <div class="hs-last" id="hs-last-temp">— °C</div>
+      <div class="hs-row">
+        <span class="hs-avg" id="hs-avg-temp">เฉลี่ย —</span>
+        <span class="hs-min" id="hs-min-temp">Min —</span>
+        <span class="hs-max" id="hs-max-temp">Max —</span>
+      </div>
+    </div>
+    <div class="hs-card" id="sumHum">
+      <div class="hs-icon">💧</div>
+      <div class="hs-name">Humidity</div>
+      <div class="hs-last" id="hs-last-hum">— %RH</div>
+      <div class="hs-row">
+        <span class="hs-avg" id="hs-avg-hum">เฉลี่ย —</span>
+        <span class="hs-min" id="hs-min-hum">Min —</span>
+        <span class="hs-max" id="hs-max-hum">Max —</span>
+      </div>
+    </div>
+    <div class="hs-card" id="sumLdr1">
+      <div class="hs-icon">☀️</div>
+      <div class="hs-name">LDR East</div>
+      <div class="hs-last" id="hs-last-ldr1">— Lux</div>
+      <div class="hs-row">
+        <span class="hs-avg" id="hs-avg-ldr1">เฉลี่ย —</span>
+        <span class="hs-min" id="hs-min-ldr1">Min —</span>
+        <span class="hs-max" id="hs-max-ldr1">Max —</span>
+      </div>
+    </div>
+    <div class="hs-card" id="sumLdr2">
+      <div class="hs-icon">🌤️</div>
+      <div class="hs-name">LDR West</div>
+      <div class="hs-last" id="hs-last-ldr2">— Lux</div>
+      <div class="hs-row">
+        <span class="hs-avg" id="hs-avg-ldr2">เฉลี่ย —</span>
+        <span class="hs-min" id="hs-min-ldr2">Min —</span>
+        <span class="hs-max" id="hs-max-ldr2">Max —</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2×2 Chart Grid -->
+  <div class="hist-charts-grid">
+    <div class="hcrd">
+      <div class="hcrd-hdr"><span class="hcrd-dot" style="background:#ef5350"></span>Temperature (°C)</div>
+      <div class="hcrd-wrap"><canvas id="chartTemp"></canvas></div>
+    </div>
+    <div class="hcrd">
+      <div class="hcrd-hdr"><span class="hcrd-dot" style="background:#29b6f6"></span>Humidity (%RH)</div>
+      <div class="hcrd-wrap"><canvas id="chartHum"></canvas></div>
+    </div>
+    <div class="hcrd">
+      <div class="hcrd-hdr"><span class="hcrd-dot" style="background:#ffa726"></span>LDR East (Lux)</div>
+      <div class="hcrd-wrap"><canvas id="chartLdr1"></canvas></div>
+    </div>
+    <div class="hcrd">
+      <div class="hcrd-hdr"><span class="hcrd-dot" style="background:#ffee58"></span>LDR West (Lux)</div>
+      <div class="hcrd-wrap"><canvas id="chartLdr2"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════
+   ⚙️  CONFIG — แก้ไขตรงนี้ตามการตั้งค่าของคุณ
+   ══════════════════════════════════════════════ */
+const CFG = {
+  // MQTT Broker (WebSocket)
+  MQTT_URL:      'wss://rail.kls.ac.th:9002',
+  MQTT_USER:     '',          // ใส่ username ถ้า broker ต้องการ (ถ้าไม่มีให้ปล่อยว่าง)
+  MQTT_PASS:     '',          // ใส่ password ถ้า broker ต้องการ
+
+  // หัวข้อ MQTT (ตรงตาม topic ที่ broker ส่ง)
+  TOPIC_HUM:     'Rail_Hum09',
+  TOPIC_TEMP:    'Rail_Temp09',
+  TOPIC_LDR1:    '2RAIL_LDR1',
+  TOPIC_LDR2:    '2RAIL_LDR2',
+
+  // n8n AI Chat Webhook (ต้อง Activate Workflow 2 ก่อน)
+  N8N_WEBHOOK:   'http://localhost:5678/webhook/farm-chat',
+
+  // จำนวนจุดสูงสุดในกราฟ
+  MAX_PTS:       50,
+
+  // ค่าเตือน (ปรับตามชนิดพืชของคุณ)
+  ALERT_HUM_MIN:  55,   ALERT_HUM_MAX:  85,
+  ALERT_TEMP_MIN: 18,   ALERT_TEMP_MAX: 32
+};
+
+/* ══════ State ══════ */
+const S = {
+  hum:  { cur:null, hist:[], lbl:[] },
+  temp: { cur:null, hist:[], lbl:[] },
+  ldr1: { cur:null, hist:[], lbl:[] },
+  ldr2: { cur:null, hist:[], lbl:[] }
+};
+
+/* ══════ Chart factory ══════ */
+function mkChart(id, color) {
+  return new Chart(document.getElementById(id).getContext('2d'), {
+    type: 'line',
+    data: { labels:[], datasets:[{ data:[], borderColor:color, backgroundColor:color+'18',
+            borderWidth:2, pointRadius:2, pointHoverRadius:5, fill:true, tension:.4 }] },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      animation:{ duration:200 },
+      interaction:{ intersect:false, mode:'index' },
+      plugins:{
+        legend:{ display:false },
+        tooltip:{
+          backgroundColor:'#0d1a10', borderColor:color, borderWidth:1,
+          titleColor:'#e8f5e9', bodyColor:color
+        }
+      },
+      scales:{
+        x:{ grid:{color:'rgba(255,255,255,.04)'}, ticks:{color:'#6a9a74',font:{size:10},maxTicksLimit:7,maxRotation:0} },
+        y:{ grid:{color:'rgba(255,255,255,.04)'}, ticks:{color:'#6a9a74',font:{size:10}} }
+      }
+    }
+  });
+}
+
+const charts = {
+  hum:  mkChart('ch-hum',  '#29b6f6'),
+  temp: mkChart('ch-temp', '#ef5350'),
+  ldr1: mkChart('ch-ldr1', '#ffa726'),
+  ldr2: mkChart('ch-ldr2', '#ffee58')
+};
+
+/* ══════ Push data to card + chart ══════ */
+function push(key, chartKey, valElem, trIcon, trMeta, value, decimals=1) {
+  const s = S[key];
+  const prev = s.cur;
+  s.cur = value;
+
+  // Card
+  document.getElementById(valElem).textContent = value.toFixed(decimals);
+  document.getElementById('lastUpd').textContent = new Date().toLocaleTimeString('th-TH');
+
+  // Trend
+  const icon = document.getElementById(trIcon);
+  const meta = document.getElementById(trMeta);
+  if (prev !== null) {
+    const d = value - prev;
+    if (d > 0.5)       { icon.className='fas fa-arrow-trend-up up';   meta.textContent=`+${d.toFixed(1)} จากก่อนหน้า`; }
+    else if (d < -0.5) { icon.className='fas fa-arrow-trend-down dn'; meta.textContent=`${d.toFixed(1)} จากก่อนหน้า`; }
+    else                { icon.className='fas fa-minus'; meta.textContent='คงที่'; }
+  } else {
+    meta.textContent = 'รับข้อมูลแล้ว ✓';
+  }
+
+  // Chart
+  const t = new Date().toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  s.hist.push(value); s.lbl.push(t);
+  if (s.hist.length > CFG.MAX_PTS) { s.hist.shift(); s.lbl.shift(); }
+  const c = charts[chartKey];
+  c.data.labels = [...s.lbl];
+  c.data.datasets[0].data = [...s.hist];
+  c.update('none');
+}
+
+/* ══════ Alerts ══════ */
+function chkAlert(id, val, min, max, labelHi, labelLo) {
+  const bar = document.getElementById('alertsBar');
+  const eid = 'al-'+id;
+  let el = document.getElementById(eid);
+  if (val < min || val > max) {
+    const msg = `⚠️ ${labelHi} ${val.toFixed(1)} ${val < min ? 'ต่ำกว่า' : 'สูงกว่า'} ช่วงเหมาะสม (${min}–${max}${labelLo})`;
+    if (!el) { el=document.createElement('div'); el.id=eid; el.className='alert warn'; bar.appendChild(el); }
+    el.textContent = msg;
+  } else if (el) el.remove();
+}
+
+/* ══════ MQTT ══════ */
+function connectMQTT() {
+  const badge = document.getElementById('mqttBadge');
+  const label = document.getElementById('mqttLabel');
+
+  const opts = {
+    clientId: 'farm_dash_' + Math.random().toString(16).slice(2,10),
+    clean: true, reconnectPeriod: 4000, connectTimeout: 12000
+  };
+  if (CFG.MQTT_USER) { opts.username = CFG.MQTT_USER; opts.password = CFG.MQTT_PASS; }
+
+  window.mqttClient = mqtt.connect(CFG.MQTT_URL, opts);
+  const client = window.mqttClient;
+
+  client.on('connect', () => {
+    badge.className = 'mqtt-badge ok';
+    label.textContent = 'MQTT: เชื่อมต่อแล้ว ✓';
+    [CFG.TOPIC_HUM, CFG.TOPIC_TEMP, CFG.TOPIC_LDR1, CFG.TOPIC_LDR2].forEach(t => {
+      client.subscribe(t, err => { if(err) console.warn('Sub error:', t, err); });
+    });
+    // Subscribe Rail-SM09 สำหรับ Relay feedback log
+    client.subscribe('Rail-SM09', err => {
+      const dot = document.getElementById('rlSubDot');
+      const txt = document.getElementById('rlSubStatus');
+      if (!err) {
+        if (dot) { dot.className = 'rl-sub-dot live'; }
+        if (txt) txt.textContent = 'Subscribe แล้ว · Rail-SM09';
+      }
+    });
+  });
+
+  client.on('message', (topic, raw) => {
+    let val;
+    try {
+      const s = raw.toString().trim();
+      try { const j=JSON.parse(s); val = typeof j==='object' ? (j.value??j.v??Object.values(j)[0]) : +s; }
+      catch { val = parseFloat(s); }
+    } catch { return; }
+    if (isNaN(val)) return;
+
+    if      (topic === CFG.TOPIC_HUM)  { push('hum','hum','v-hum','ti-hum','tm-hum',val,1); chkAlert('hum',val,CFG.ALERT_HUM_MIN,CFG.ALERT_HUM_MAX,'ความชื้น','%'); }
+    else if (topic === CFG.TOPIC_TEMP) { push('temp','temp','v-temp','ti-temp','tm-temp',val,1); chkAlert('temp',val,CFG.ALERT_TEMP_MIN,CFG.ALERT_TEMP_MAX,'อุณหภูมิ','°C'); }
+    else if (topic === CFG.TOPIC_LDR1) { push('ldr1','ldr1','v-ldr1','ti-ldr1','tm-ldr1',val,0); }
+    else if (topic === CFG.TOPIC_LDR2) { push('ldr2','ldr2','v-ldr2','ti-ldr2','tm-ldr2',val,0); }
+    else if (topic === 'Rail-SM09') { addRelayLog('RECV', raw.toString().trim()); return; }
+  });
+
+  client.on('error',      e  => { badge.className='mqtt-badge err'; label.textContent='MQTT Error: '+e.message; });
+  client.on('disconnect', () => { badge.className='mqtt-badge err'; label.textContent='MQTT: ขาดการเชื่อมต่อ'; });
+  client.on('reconnect',  () => { badge.className='mqtt-badge wait'; label.textContent='MQTT: กำลัง reconnect...'; });
+}
+
+/* ══════ Camera — manual connect (same approach as standalone) ══════ */
+function camConnect() {
+  const url   = (document.getElementById('camBrokerUrl').value || '').trim();
+  const topic = (document.getElementById('camTopic').value || '').trim();
+  if (!url || !topic) return;
+
+  camDisconnect();
+  setCamStatus('wait', 'กำลังเชื่อมต่อ...');
+
+  let _rawMsgCount = 0;
+
+  const opts = {
+    clientId: 'farm_cam_' + Math.random().toString(16).slice(2,10),
+    clean: true, reconnectPeriod: 3000, connectTimeout: 10000
+  };
+  const cam = mqtt.connect(url, opts);
+  window.camMqttClient = cam;
+
+  cam.on('connect', () => {
+    cam.subscribe(topic, err => {
+      if (err) { setCamStatus('', 'Subscribe error: ' + err.message); return; }
+      setCamStatus('live', 'connected · ' + topic);
+    });
+    document.getElementById('camConnBtn').disabled = true;
+    document.getElementById('camDiscBtn').disabled = false;
+  });
+
+  cam.on('message', (t, message) => {
+    _rawMsgCount++;
+    if (t !== topic) return;
+
+    // ── แปลงเป็น Uint8Array (รองรับ Buffer ที่มี byteOffset) ──
+    let bytes;
+    if (message instanceof Uint8Array) {
+      bytes = message.buffer
+        ? new Uint8Array(message.buffer, message.byteOffset, message.byteLength)
+        : message;
+    } else {
+      try { bytes = new Uint8Array(message); } catch(e) { return; }
+    }
+    if (!bytes || bytes.length < 3) return;
+
+    // ── Debug: แสดง hex 16 bytes แรก ──
+    const st = document.getElementById('camConnStatus');
+    const hex16 = Array.from(bytes.slice(0, 16)).map(b => b.toString(16).padStart(2,'0')).join(' ');
+    if (st) st.textContent = `#${_rawMsgCount} len:${bytes.length} hex:[${hex16}]`;
+
+    // ── Strategy 1: binary magic bytes ที่ position 0 ──
+    if (bytes[0] === 0xFF && bytes[1] === 0xD8) { updateCamFrame('data:image/jpeg;base64,' + camBufToB64(bytes)); return; }
+    if (bytes[0] === 0x89 && bytes[1] === 0x50) { updateCamFrame('data:image/png;base64,'  + camBufToB64(bytes)); return; }
+
+    // ── Strategy 2: decode ทั้ง payload เป็น string แล้วหา /9j/ หรือ iVBOR ──
+    try {
+      const str = new TextDecoder('utf-8', {fatal:false}).decode(bytes);
+      let idx;
+      idx = str.indexOf('/9j/');
+      if (idx >= 0) {
+        // กรองเฉพาะ valid base64 chars (ตัด newline, space, suffix ที่ปน)
+        const b64 = str.slice(idx).replace(/[^A-Za-z0-9+/=]/g, '');
+        updateCamFrame('data:image/jpeg;base64,' + b64); return;
+      }
+      idx = str.indexOf('iVBOR');
+      if (idx >= 0) {
+        const b64 = str.slice(idx).replace(/[^A-Za-z0-9+/=]/g, '');
+        updateCamFrame('data:image/png;base64,' + b64); return;
+      }
+      idx = str.indexOf('data:image/');
+      if (idx >= 0) { updateCamFrame(str.slice(idx).trim()); return; }
+    } catch(e) {}
+
+    // ── Strategy 3: หา binary FF D8 FF ในทั้ง buffer (กรณี prefix + binary JPEG) ──
+    for (let i = 1; i < bytes.length - 2; i++) {
+      if (bytes[i] === 0xFF && bytes[i+1] === 0xD8 && bytes[i+2] === 0xFF) {
+        updateCamFrame('data:image/jpeg;base64,' + camBufToB64(bytes.slice(i))); return;
+      }
+    }
+  });
+
+  cam.on('error',      e  => setCamStatus('', 'Error: ' + e.message));
+  cam.on('reconnect',  () => setCamStatus('wait', 'Reconnecting...'));
+  cam.on('disconnect', () => setCamStatus('', 'ขาดการเชื่อมต่อ'));
+}
+
+function camDisconnect() {
+  if (window.camMqttClient) {
+    try { window.camMqttClient.end(true); } catch(e) {}
+    window.camMqttClient = null;
+  }
+  setCamStatus('', 'ยังไม่ได้เชื่อมต่อ');
+  const cb = document.getElementById('camConnBtn');
+  const db = document.getElementById('camDiscBtn');
+  if (cb) cb.disabled = false;
+  if (db) db.disabled = true;
+}
+
+function setCamStatus(state, text) {
+  const dot = document.getElementById('camDot');
+  const st  = document.getElementById('camConnStatus');
+  if (dot) dot.className = 'cam-dot' + (state === 'live' ? ' live' : state === 'wait' ? ' wait' : '');
+  if (st)  st.textContent = text;
+}
+
+/* ══════ Camera helpers ══════ */
+// รับ Uint8Array โดยตรง → base64 string
+function camBufToB64(bytes) {
+  let binary = '', chunk = 8192;
+  for (let i = 0; i < bytes.length; i += chunk)
+    binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + chunk, bytes.length)));
+  return btoa(binary);
+}
+
+let _camFrames = 0, _camTimes = [];
+
+function updateCamFrame(src) {
+  const img  = document.getElementById('camImg');
+  const ph   = document.getElementById('camPlaceholder');
+  const dot  = document.getElementById('camDot');
+  const fps  = document.getElementById('camFps');
+  const time = document.getElementById('camTime');
+  const frm  = document.getElementById('camFrames');
+  if (!img) return;
+
+  if (dot) dot.className = 'cam-dot live';
+  const st = document.getElementById('camConnStatus');
+
+  // preload ใน object ก่อน — swap เข้า img เฉพาะเมื่อ decode เสร็จ (ไม่กระพริบ)
+  const tmp = new Image();
+  tmp.onload = () => {
+    if (ph) ph.style.display = 'none';
+    img.style.display = 'block';
+    img.src = tmp.src;
+    if (st) st.textContent = 'connected · Rail-IMG07';
+  };
+  tmp.onerror = () => {
+    if (st) st.textContent = '⚠ frame decode fail — holding last frame';
+  };
+  tmp.src = src;
+
+  _camFrames++;
+  const now = Date.now();
+  _camTimes.push(now);
+  if (_camTimes.length > 10) _camTimes.shift();
+  if (_camTimes.length >= 2) {
+    const span = (_camTimes.at(-1) - _camTimes[0]) / 1000;
+    if (fps) fps.textContent = ((_camTimes.length - 1) / span).toFixed(1) + ' FPS';
+  }
+  if (time) time.textContent = new Date().toLocaleTimeString('th-TH', {hour12:false});
+  if (frm)  frm.textContent  = _camFrames + ' frames';
+}
+
+/* ══════ Chat helpers ══════ */
+function sensorCtx() {
+  return [
+    `[ค่าเซ็นเซอร์ปัจจุบัน ณ ${new Date().toLocaleString('th-TH')}]`,
+    `• ความชื้น (Rail_Hum09): ${S.hum.cur!==null ? S.hum.cur.toFixed(1)+'%' : 'ยังไม่ได้รับข้อมูล'}`,
+    `• อุณหภูมิ (Rail_Temp09): ${S.temp.cur!==null ? S.temp.cur.toFixed(1)+'°C' : 'ยังไม่ได้รับข้อมูล'}`,
+    `• แสง 1 (2RAIL_LDR1): ${S.ldr1.cur!==null ? S.ldr1.cur.toFixed(0)+' lux' : 'ยังไม่ได้รับข้อมูล'}`,
+    `• แสง 2 (2RAIL_LDR2): ${S.ldr2.cur!==null ? S.ldr2.cur.toFixed(0)+' lux' : 'ยังไม่ได้รับข้อมูล'}`
+  ].join('\n');
+}
+
+function appendMsg(text, who) {
+  const box = document.getElementById('chatBox');
+  const d = document.createElement('div');
+  d.className = `msg ${who}`;
+  d.innerHTML = `<div class="msg-av">${who==='user'?'👤':'🌱'}</div><div class="msg-bub">${text.replace(/\n/g,'<br>')}</div>`;
+  box.appendChild(d);
+  box.scrollTop = box.scrollHeight;
+}
+
+function showTyping() {
+  const box = document.getElementById('chatBox');
+  const d = document.createElement('div');
+  d.id='typing'; d.className='msg ai';
+  d.innerHTML=`<div class="msg-av">🌱</div><div class="msg-bub"><div class="typing-bub"><div class="tdot"></div><div class="tdot"></div><div class="tdot"></div></div></div>`;
+  box.appendChild(d); box.scrollTop=box.scrollHeight;
+}
+
+/* ══════ Send chat ══════ */
+async function sendMsg() {
+  const inp = document.getElementById('chatInput');
+  const btn = document.getElementById('sendBtn');
+  const q = inp.value.trim();
+  if (!q) return;
+  inp.value=''; btn.disabled=true;
+  appendMsg(q,'user');
+  showTyping();
+
+  const body    = JSON.stringify({ question:q, sensorContext:sensorCtx(), timestamp:new Date().toISOString() });
+  const headers = { 'Content-Type':'application/json' };
+
+  // ลอง production URL ก่อน ถ้าไม่ได้ลอง test URL อัตโนมัติ
+  const prodUrl = CFG.N8N_WEBHOOK;
+  const testUrl = CFG.N8N_WEBHOOK.replace('/webhook/', '/webhook-test/');
+  const urls    = [prodUrl, testUrl];
+
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, { method:'POST', headers, body });
+      document.getElementById('typing')?.remove();
+      if (res.ok) {
+        const d   = await res.json();
+        const ans = d.answer ?? d.output ?? d.text ?? d.response ?? JSON.stringify(d);
+        const mode = url === testUrl ? ' _(test mode)_' : '';
+        appendMsg(ans + mode, 'ai');
+        btn.disabled=false; inp.focus();
+        return;
+      } else {
+        // status error — ไม่ลอง URL ต่อไป แสดง error ทันที
+        document.getElementById('typing')?.remove();
+        appendMsg(`❌ n8n ตอบกลับ status ${res.status}\nกรุณาตรวจสอบ Credentials (Google Sheets / OpenAI) ใน n8n`, 'ai');
+        btn.disabled=false; inp.focus();
+        return;
+      }
+    } catch { /* URL นี้ใช้ไม่ได้ ลอง URL ต่อไป */ }
+  }
+
+  // ทั้ง 2 URL ใช้ไม่ได้
+  document.getElementById('typing')?.remove();
+  appendMsg(
+    '❌ เชื่อมต่อ n8n ไม่ได้ทั้ง 2 URL\n\n' +
+    '📋 ตรวจสอบตามนี้:\n' +
+    '1. เปิดหน้านี้จาก http://localhost:3000 (ไม่ใช่ file://)\n' +
+    '2. n8n กำลังทำงานอยู่ที่ localhost:5678\n' +
+    '3. กด Toggle "Activate" Workflow 2 ใน n8n ให้เป็นสีเขียว\n' +
+    '   หรือ เปิด node Webhook แล้วกด "Listen for test event"',
+    'ai'
+  );
+  btn.disabled=false; inp.focus();
+}
+
+function ask(q) { document.getElementById('chatInput').value=q; sendMsg(); }
+
+/* ══════════════════════════════════════════════
+   📋  RELAY MESSAGE LOG
+   ══════════════════════════════════════════════ */
+const RELAY_MAP = {
+  'AON' :{ num:1, label:'Relay ช่อง 1 เปิด',  on:true  },
+  'AOFF':{ num:1, label:'Relay ช่อง 1 ปิด',   on:false },
+  'BON' :{ num:2, label:'Relay ช่อง 2 เปิด',  on:true  },
+  'BOFF':{ num:2, label:'Relay ช่อง 2 ปิด',   on:false },
+  'CON' :{ num:3, label:'Relay ช่อง 3 เปิด',  on:true  },
+  'COFF':{ num:3, label:'Relay ช่อง 3 ปิด',   on:false },
+};
+let rlMsgCount = 0;
+
+function addRelayLog(dir, payload) {
+  const body  = document.getElementById('relayLogBody');
+  const empty = document.getElementById('rlEmpty');
+  const cntEl = document.getElementById('rlCount');
+  if (!body) return;
+
+  if (empty) empty.style.display = 'none';
+  rlMsgCount++;
+  if (cntEl) cntEl.textContent = rlMsgCount + ' ข้อความ';
+
+  const info  = RELAY_MAP[payload.toUpperCase()];
+  const desc  = info ? info.label : '(unknown payload)';
+  const dotCls = info ? (info.on ? 'on' : 'off') : 'unk';
+  const now   = new Date();
+  const ts    = now.toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  const dirCls = dir === 'SENT' ? 'sent' : 'recv';
+  const dirLbl = dir === 'SENT' ? '↑ SENT' : '↓ RECV';
+
+  const row = document.createElement('div');
+  row.className = 'rl-entry';
+  row.innerHTML =
+    '<span class="rl-time">' + ts + '</span>' +
+    '<span class="rl-dir '  + dirCls + '">' + dirLbl + '</span>' +
+    '<span class="rl-dot '  + dotCls + '"></span>' +
+    '<span class="rl-payload">' + payload.toUpperCase() + '</span>' +
+    '<span class="rl-desc">' + desc + '</span>';
+
+  // Newest on top
+  if (body.firstChild) body.insertBefore(row, body.firstChild);
+  else body.appendChild(row);
+
+  // Keep max 100 rows
+  while (body.children.length > 100) body.removeChild(body.lastChild);
+}
+
+function clearRelayLog() {
+  const body = document.getElementById('relayLogBody');
+  if (body) body.innerHTML = '<div class="rl-empty" id="rlEmpty"><i class="fas fa-satellite-dish" style="opacity:.5"></i> รอรับข้อความจาก Rail-SM09...</div>';
+  rlMsgCount = 0;
+  const cntEl = document.getElementById('rlCount');
+  if (cntEl) cntEl.textContent = '0 ข้อความ';
+}
+
+/* ══════════════════════════════════════════════
+   🔌  RELAY CONTROL — MQTT Publish
+   ══════════════════════════════════════════════ */
+function relayCtrl(ch, action, num) {
+  const topic   = 'Rail-SM09';        // topic เดียวสำหรับทุกช่อง
+  const payload = ch + action;        // AON / AOFF / BON / BOFF / CON / COFF
+  const card   = document.getElementById('rcrd'   + num);
+  const badge  = document.getElementById('rcBadge'+ num);
+  const txt    = document.getElementById('rcTxt'  + num);
+  const onBtn  = document.getElementById('rcOn'   + num);
+  const offBtn = document.getElementById('rcOff'  + num);
+
+  if (!window.mqttClient || !window.mqttClient.connected) {
+    showRelayToast('⚠️ MQTT ยังไม่เชื่อมต่อ — ไม่สามารถส่งคำสั่งได้', true);
+    return;
+  }
+
+  // Disable both buttons while sending
+  onBtn.disabled = offBtn.disabled = true;
+
+  window.mqttClient.publish(topic, payload, { qos: 0, retain: false }, function(err) {
+    onBtn.disabled = offBtn.disabled = false;
+
+    if (err) {
+      showRelayToast('❌ ส่งคำสั่ง [Rail-SM09 → ' + payload + '] ล้มเหลว', true);
+      return;
+    }
+
+    const isOn = (action === 'ON');
+
+    // Card state
+    if (isOn) {
+      card.classList.add('rc-on');
+      txt.textContent  = 'เปิดอยู่';
+      onBtn.classList.add('rc-sel');
+      offBtn.classList.remove('rc-sel');
+    } else {
+      card.classList.remove('rc-on');
+      txt.textContent  = 'ปิดอยู่';
+      onBtn.classList.remove('rc-sel');
+      offBtn.classList.add('rc-sel');
+    }
+
+    // บันทึก SENT ลง log
+    addRelayLog('SENT', payload);
+
+    showRelayToast(
+      (isOn ? '✅' : '🔴') +
+      ' [Rail-SM09] payload: ' + payload + ' — Relay ช่อง ' + num +
+      (isOn ? ' เปิด' : ' ปิด') + ' แล้ว'
+    );
+  });
+}
+
+let _toastTimer = null;
+function showRelayToast(msg, isErr) {
+  const t = document.getElementById('relayToast');
+  if (!t) return;
+  t.innerHTML = '<i class="fas fa-' + (isErr ? 'triangle-exclamation rt-err' : 'circle-check') + '"></i> ' + msg;
+  t.className = 'rt-show' + (isErr ? ' rt-err' : '');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(function(){ t.className = ''; }, 3200);
+}
+
+/* ══════════════════════════════════════════════
+   ☀️  SOLAR TRACKER ANIMATION  (v2 – cartoon style)
+   ══════════════════════════════════════════════ */
+(function() {
+  const canvas = document.getElementById('solarCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  let W, H;
+
+  function resize() {
+    W = canvas.width = canvas.parentElement.clientWidth;
+    H = canvas.height = 320;
+  }
+
+  function lerp(a,b,t){ return a+(b-a)*Math.max(0,Math.min(1,t)); }
+
+  // ── Pre-computed stable decoration positions (no Math.random in draw loop) ──
+  const FLOWERS = [0.06,0.11,0.17,0.25,0.34,0.66,0.75,0.83,0.89,0.94].map((xf,i)=>({xf, yOff:Math.sin(i*5.3)*0.004}));
+  const GRASS = Array.from({length:34},(_,i)=>({
+    xf:i/34+0.01, yOff:2+Math.abs(Math.sin(i*2.7))*6,
+    len:6+Math.abs(Math.cos(i*1.9))*5, a1:Math.sin(i*1.3)*0.36, a2:Math.sin(i*2.1)*0.30
+  }));
+  const ROCKS = [{xf:.92,yf:.83,rw:22,rh:14},{xf:.96,yf:.87,rw:15,rh:9},
+                 {xf:.05,yf:.84,rw:20,rh:13},{xf:.08,yf:.89,rw:13,rh:8}];
+  const TREES = [{xf:.04,yf:.63,r:.026},{xf:.09,yf:.59,r:.021},
+                 {xf:.87,yf:.61,r:.025},{xf:.92,yf:.67,r:.020},{xf:.95,yf:.63,r:.016}];
+  const clouds = [{x:.11,y:.10,w:.14,spd:.0000155},{x:.40,y:.06,w:.11,spd:.0000118},{x:.72,y:.13,w:.13,spd:.0000190}];
+
+  // ── Sky: warm golden hazy tone (matching reference cartoon) ──
+  function drawSky(rawT, t) {
+    const g = ctx.createLinearGradient(0,0,0,H*0.73);
+    if (rawT<=0) {
+      g.addColorStop(0,'#0d1b3e'); g.addColorStop(.6,'#1a2f5c'); g.addColorStop(1,'#243b6a');
+    } else if (rawT<0.12) {
+      const f=rawT/0.12;
+      g.addColorStop(0,`rgb(${lerp(13,95,f)|0},${lerp(27,125,f)|0},${lerp(62,185,f)|0})`);
+      g.addColorStop(.5,`rgb(${lerp(26,245,f)|0},${lerp(47,115,f)|0},${lerp(92,25,f)|0})`);
+      g.addColorStop(1,`rgb(${lerp(42,255,f)|0},${lerp(63,195,f)|0},${lerp(111,55,f)|0})`);
+    } else if (rawT>0.88) {
+      const f=(rawT-.88)/.12;
+      g.addColorStop(0,`rgb(${lerp(95,20,f)|0},${lerp(125,15,f)|0},${lerp(185,50,f)|0})`);
+      g.addColorStop(.5,`rgb(${lerp(245,210,f)|0},${lerp(115,55,f)|0},${lerp(25,8,f)|0})`);
+      g.addColorStop(1,`rgb(${lerp(255,155,f)|0},${lerp(195,65,f)|0},${lerp(55,18,f)|0})`);
+    } else {
+      // Daytime: warm hazy golden sky like reference image
+      const noon=1-Math.abs(t-.5)*2;
+      g.addColorStop(0,`rgb(${lerp(150,170,noon)|0},${lerp(188,202,noon)|0},${lerp(212,218,noon)|0})`);
+      g.addColorStop(.40,`rgb(${lerp(198,218,noon)|0},${lerp(212,224,noon)|0},${lerp(182,188,noon)|0})`);
+      g.addColorStop(.72,`rgb(${lerp(238,252,noon)|0},${lerp(218,232,noon)|0},${lerp(148,158,noon)|0})`);
+      g.addColorStop(1,`rgb(${lerp(252,248,noon)|0},${lerp(212,222,noon)|0},${lerp(118,128,noon)|0})`);
+    }
+    ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  }
+
+  // ── Stars & moon ──
+  function drawStarsAndMoon(rawT) {
+    const a=rawT<=0?1:rawT<.10?(.10-rawT)/.10:rawT>.90?(rawT-.90)/.10:0;
+    if(a<=0) return;
+    [[.05,.04],[.18,.10],[.30,.03],[.42,.13],[.58,.05],[.68,.14],[.82,.07],[.93,.03],[.12,.20],[.50,.17],[.76,.22]].forEach(([fx,fy])=>{
+      ctx.beginPath(); ctx.arc(fx*W,fy*H,1.8,0,Math.PI*2); ctx.fillStyle=`rgba(255,255,240,${a*.9})`; ctx.fill();
+    });
+    if(a>.3){
+      const mx=W*.78,my=H*.16,mr=H*.065;
+      ctx.beginPath(); ctx.arc(mx,my,mr,0,Math.PI*2); ctx.fillStyle=`rgba(255,249,196,${a})`; ctx.fill();
+      ctx.beginPath(); ctx.arc(mx+mr*.32,my-mr*.1,mr*.82,0,Math.PI*2);
+      ctx.fillStyle=rawT<=0?'#0d1b3e':'#1a2f5c'; ctx.fill();
+    }
+  }
+
+  // ── Cloud: warm cream like reference ──
+  function drawCloud(xf,yf,wf,alpha=1) {
+    const cx=xf*W,cy=yf*H,cw=wf*W,ch=cw*.36;
+    ctx.save(); ctx.globalAlpha=alpha; ctx.fillStyle='rgba(255,252,228,.90)';
+    [[0,0,ch*.63],[cw*.29,-ch*.11,ch*.53],[cw*.56,ch*.05,ch*.48],[-cw*.21,ch*.10,ch*.43],[cw*.14,-ch*.19,ch*.40]].forEach(([dx,dy,r])=>{
+      ctx.beginPath(); ctx.arc(cx+dx,cy+dy,r,0,Math.PI*2); ctx.fill();
+    });
+    ctx.globalAlpha=1; ctx.restore();
+  }
+
+  // ── Sun: large orange circle with rays (matches reference) ──
+  function drawSun(sx,sy,rawT) {
+    const r=Math.max(18,Math.min(W,H)*.092);
+    const low=rawT<.15||rawT>.85;
+    // Outer haze
+    const hz=ctx.createRadialGradient(sx,sy,r,sx,sy,r*4.5);
+    hz.addColorStop(0,low?'rgba(255,130,0,.52)':'rgba(255,208,48,.38)');
+    hz.addColorStop(1,'rgba(255,180,0,0)');
+    ctx.fillStyle=hz; ctx.beginPath(); ctx.arc(sx,sy,r*4.5,0,Math.PI*2); ctx.fill();
+    // Rays rotating slowly
+    ctx.save(); ctx.translate(sx,sy); ctx.rotate(Date.now()/10000);
+    for(let i=0;i<12;i++){
+      const a=(i/12)*Math.PI*2;
+      ctx.beginPath(); ctx.moveTo(Math.cos(a)*r*1.22,Math.sin(a)*r*1.22); ctx.lineTo(Math.cos(a)*r*1.82,Math.sin(a)*r*1.82);
+      ctx.strokeStyle=low?'rgba(255,128,0,.90)':'rgba(255,208,55,.90)';
+      ctx.lineWidth=r*.13; ctx.lineCap='round'; ctx.stroke();
+    }
+    ctx.restore();
+    // Body
+    const sg=ctx.createRadialGradient(sx-r*.28,sy-r*.28,r*.1,sx,sy,r);
+    sg.addColorStop(0,low?'#FFCC00':'#FFD740'); sg.addColorStop(1,low?'#FF8C00':'#FF9800');
+    ctx.beginPath(); ctx.arc(sx,sy,r,0,Math.PI*2); ctx.fillStyle=sg; ctx.fill();
+    ctx.strokeStyle=low?'#E65100':'#FF6F00'; ctx.lineWidth=r*.09; ctx.stroke();
+  }
+
+  function groundY(xf){ return H*.73-Math.sin(xf*Math.PI*2.5+.4)*H*.055; }
+
+  // ── Terrain: matches reference cartoon (hills, trees, fence, flowers) ──
+  function drawTerrain() {
+    // Far mountains – dark green
+    ctx.beginPath(); ctx.moveTo(0,H);
+    [[0,.73],[.07,.41],[.18,.58],[.30,.34],[.44,.51],[.56,.31],[.70,.47],[.82,.37],[.93,.51],[1,.44],[1,.73]].forEach(([x,y])=>ctx.lineTo(x*W,y*H));
+    ctx.closePath(); ctx.fillStyle='#3d6b34'; ctx.fill();
+    // Mid hills – brighter
+    ctx.beginPath(); ctx.moveTo(0,H);
+    [[0,.76],[.06,.63],[.13,.72],[.22,.56],[.32,.68],[.40,.58],[.51,.70],[.62,.59],[.72,.72],[.84,.57],[.93,.68],[1,.60],[1,.76]].forEach(([x,y])=>ctx.lineTo(x*W,y*H));
+    ctx.closePath(); ctx.fillStyle='#528a40'; ctx.fill();
+    // Trees on hills
+    TREES.forEach(({xf,yf,r:tr})=>{
+      const tx=xf*W,ty=yf*H,trpx=tr*W;
+      ctx.fillStyle='#5D4037'; ctx.fillRect(tx-trpx*.14,ty,trpx*.28,trpx*.55);
+      [[0,-.82,1.0],[-.52,-.28,.70],[.52,-.28,.70]].forEach(([dx,dy,rs])=>{
+        ctx.beginPath(); ctx.arc(tx+dx*trpx,ty+dy*trpx,trpx*rs,0,Math.PI*2); ctx.fillStyle='#2E7D32'; ctx.fill();
+      });
+      ctx.beginPath(); ctx.arc(tx,ty-trpx*.82,trpx,0,Math.PI*2); ctx.fillStyle='#388E3C'; ctx.fill();
+    });
+    // Fence in midground
+    const fy=H*.685;
+    ctx.strokeStyle='rgba(141,110,99,.72)'; ctx.lineWidth=1.5;
+    for(let fx=.27;fx<.73;fx+=.024){const x=fx*W;ctx.beginPath();ctx.moveTo(x,fy);ctx.lineTo(x,fy-H*.038);ctx.stroke();}
+    ctx.beginPath();ctx.moveTo(W*.27,fy-H*.028);ctx.lineTo(W*.73,fy-H*.028);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(W*.27,fy-H*.014);ctx.lineTo(W*.73,fy-H*.014);ctx.stroke();
+    // Main ground
+    ctx.beginPath(); ctx.moveTo(0,H);
+    for(let x=0;x<=W;x+=4) ctx.lineTo(x,groundY(x/W));
+    ctx.lineTo(W,H); ctx.closePath(); ctx.fillStyle='#4a8826'; ctx.fill();
+    // Bright grass stripe
+    ctx.beginPath(); ctx.moveTo(0,groundY(0));
+    for(let x=0;x<=W;x+=4) ctx.lineTo(x,groundY(x/W));
+    ctx.lineTo(W,groundY(1)+7); ctx.lineTo(0,groundY(0)+7); ctx.closePath(); ctx.fillStyle='#62a030'; ctx.fill();
+    // Top bright edge
+    ctx.beginPath(); ctx.moveTo(0,groundY(0)-2);
+    for(let x=0;x<=W;x+=4) ctx.lineTo(x,groundY(x/W)-2);
+    ctx.lineTo(W,groundY(1)+3); ctx.lineTo(0,groundY(0)+3); ctx.closePath(); ctx.fillStyle='#78c038'; ctx.fill();
+    // Flowers (pre-computed, no flicker)
+    FLOWERS.forEach(({xf,yOff})=>{
+      const gy=groundY(xf)+yOff*H-2;
+      ctx.beginPath(); ctx.arc(xf*W,gy,5,0,Math.PI*2); ctx.fillStyle='#FFD700'; ctx.fill();
+      ctx.beginPath(); ctx.arc(xf*W,gy,2.4,0,Math.PI*2); ctx.fillStyle='#FF8C00'; ctx.fill();
+    });
+    // Grass tufts (pre-computed)
+    ctx.lineCap='round';
+    GRASS.forEach(({xf,yOff,len,a1,a2})=>{
+      const gx=xf*W,gy=groundY(xf)+yOff;
+      ctx.strokeStyle='#4e8820'; ctx.lineWidth=1.2;
+      ctx.beginPath(); ctx.moveTo(gx,gy); ctx.lineTo(gx+Math.sin(a1)*len,gy-Math.cos(a1)*len); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(gx,gy); ctx.lineTo(gx+Math.sin(a2)*len*.8,gy-Math.cos(a2)*len*.8); ctx.stroke();
+    });
+    // Rocks
+    ROCKS.forEach(({xf,yf,rw,rh})=>{
+      ctx.beginPath(); ctx.ellipse(xf*W,yf*H,rw,rh,0,0,Math.PI*2);
+      ctx.fillStyle='#9E9E9E'; ctx.fill(); ctx.strokeStyle='#757575'; ctx.lineWidth=1; ctx.stroke();
+    });
+  }
+
+  // ── Wooden directional signs ──
+  function signPath(sx,sy,sw,sh,aw,dir){
+    ctx.beginPath();
+    if(dir==='left'){ctx.moveTo(sx,sy+sh/2);ctx.lineTo(sx+aw,sy);ctx.lineTo(sx+aw,sy+sh*.28);ctx.lineTo(sx+sw,sy+sh*.28);ctx.lineTo(sx+sw,sy+sh*.72);ctx.lineTo(sx+aw,sy+sh*.72);ctx.lineTo(sx+aw,sy+sh);}
+    else{ctx.moveTo(sx+sw,sy+sh/2);ctx.lineTo(sx+sw-aw,sy);ctx.lineTo(sx+sw-aw,sy+sh*.28);ctx.lineTo(sx,sy+sh*.28);ctx.lineTo(sx,sy+sh*.72);ctx.lineTo(sx+sw-aw,sy+sh*.72);ctx.lineTo(sx+sw-aw,sy+sh);}
+    ctx.closePath();
+  }
+  function drawSign(x,y,text,dir){
+    ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x,y-H*.148);
+    ctx.strokeStyle='#5D4037'; ctx.lineWidth=8; ctx.lineCap='round'; ctx.stroke();
+    const sw=W*.112,sh=H*.058,aw=sw*.23;
+    const sx=dir==='left'?x-sw*.58:x-sw*.42, sy=y-H*.148-sh*.5;
+    // Shadow
+    ctx.save(); ctx.translate(3,3); signPath(sx,sy,sw,sh,aw,dir); ctx.fillStyle='rgba(0,0,0,.22)'; ctx.fill(); ctx.restore();
+    // Wood gradient
+    const wg=ctx.createLinearGradient(sx,sy,sx,sy+sh);
+    wg.addColorStop(0,'#A1725A'); wg.addColorStop(.4,'#8D6239'); wg.addColorStop(1,'#6D4C2A');
+    signPath(sx,sy,sw,sh,aw,dir); ctx.fillStyle=wg; ctx.fill();
+    ctx.strokeStyle='#4E342E'; ctx.lineWidth=2; ctx.stroke();
+    // Wood grain
+    ctx.strokeStyle='rgba(0,0,0,.10)'; ctx.lineWidth=.7;
+    for(let i=1;i<4;i++){ctx.beginPath();ctx.moveTo(sx+aw,sy+sh*.28+(sh*.44)*(i/4));ctx.lineTo(sx+sw,sy+sh*.28+(sh*.44)*(i/4));ctx.stroke();}
+    // Text
+    const fs=Math.max(9,Math.min(12,W*.011));
+    ctx.font=`bold ${fs}px Segoe UI,sans-serif`; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillStyle='#3E2723'; ctx.fillText(text,sx+sw/2,sy+sh/2+1);
+    ctx.fillStyle='#FFF8E1'; ctx.fillText(text,sx+sw/2,sy+sh/2);
+  }
+
+  // ── Red curved rotation arrows (like reference image) ──
+  function drawRotationArcs(bx,by,pH){
+    const arcR=pH*.52, cy=by-pH*.83;
+    ctx.save(); ctx.strokeStyle='#EF5350'; ctx.lineWidth=3; ctx.lineCap='round';
+    // Left arc
+    ctx.beginPath(); ctx.arc(bx,cy,arcR,-Math.PI*.92,-Math.PI*.58,false); ctx.stroke();
+    const la=-Math.PI*.58,lx=bx+Math.cos(la)*arcR,ly=cy+Math.sin(la)*arcR;
+    ctx.beginPath(); ctx.moveTo(lx,ly); ctx.lineTo(lx+Math.cos(la+Math.PI/2-.35)*9,ly+Math.sin(la+Math.PI/2-.35)*9);
+    ctx.moveTo(lx,ly); ctx.lineTo(lx+Math.cos(la+Math.PI/2+.35)*9,ly+Math.sin(la+Math.PI/2+.35)*9); ctx.stroke();
+    // Right arc
+    ctx.beginPath(); ctx.arc(bx,cy,arcR,-Math.PI*.42,-Math.PI*.08,false); ctx.stroke();
+    const ra=-Math.PI*.08,rx=bx+Math.cos(ra)*arcR,ry=cy+Math.sin(ra)*arcR;
+    ctx.beginPath(); ctx.moveTo(rx,ry); ctx.lineTo(rx+Math.cos(ra+Math.PI/2-.35)*9,ry+Math.sin(ra+Math.PI/2-.35)*9);
+    ctx.moveTo(rx,ry); ctx.lineTo(rx+Math.cos(ra+Math.PI/2+.35)*9,ry+Math.sin(ra+Math.PI/2+.35)*9); ctx.stroke();
+    ctx.restore();
+  }
+
+  // ── Solar panel: pole + control box + rotating panel ──
+  function drawPanel(sunX,sunY,isNight){
+    const bx=W/2, by=groundY(.5), pH=H*.218;
+    // Base shadow
+    ctx.beginPath(); ctx.ellipse(bx+4,by+5,26,10,0,0,Math.PI*2); ctx.fillStyle='rgba(0,0,0,.25)'; ctx.fill();
+    // Base
+    const bg=ctx.createRadialGradient(bx-5,by-3,3,bx,by,26);
+    bg.addColorStop(0,'#78909C'); bg.addColorStop(1,'#455A64');
+    ctx.beginPath(); ctx.ellipse(bx,by,26,10,0,0,Math.PI*2); ctx.fillStyle=bg; ctx.fill();
+    ctx.strokeStyle='#37474F'; ctx.lineWidth=1.5; ctx.stroke();
+    // Bolts on base
+    [45,135,225,315].forEach(deg=>{const rad=deg*Math.PI/180;ctx.beginPath();ctx.arc(bx+Math.cos(rad)*18,by+Math.sin(rad)*6,2,0,Math.PI*2);ctx.fillStyle='#263238';ctx.fill();});
+    // Pole gradient
+    const pg=ctx.createLinearGradient(bx-6,0,bx+6,0);
+    pg.addColorStop(0,'#B0BEC5'); pg.addColorStop(.3,'#CFD8DC'); pg.addColorStop(.7,'#90A4AE'); pg.addColorStop(1,'#78909C');
+    ctx.beginPath(); ctx.moveTo(bx,by); ctx.lineTo(bx,by-pH);
+    ctx.strokeStyle=pg; ctx.lineWidth=12; ctx.lineCap='round'; ctx.stroke();
+    // Control box
+    const bxY=by-pH+pH*.34, bxG=ctx.createLinearGradient(bx-13,bxY,bx+13,bxY+20);
+    bxG.addColorStop(0,'#607D8B'); bxG.addColorStop(1,'#455A64');
+    ctx.fillStyle=bxG; ctx.fillRect(bx-13,bxY,26,20);
+    ctx.strokeStyle='#37474F'; ctx.lineWidth=1.5; ctx.strokeRect(bx-13,bxY,26,20);
+    ctx.beginPath(); ctx.arc(bx,bxY+10,3,0,Math.PI*2); ctx.fillStyle=isNight?'#555':'#00E676'; ctx.fill();
+    // Joint
+    ctx.beginPath(); ctx.arc(bx,by-pH,9,0,Math.PI*2);
+    const jg=ctx.createRadialGradient(bx-3,by-pH-3,2,bx,by-pH,9);
+    jg.addColorStop(0,'#78909C'); jg.addColorStop(1,'#37474F');
+    ctx.fillStyle=jg; ctx.fill(); ctx.strokeStyle='#263238'; ctx.lineWidth=1.5; ctx.stroke();
+    // Red rotation arcs
+    drawRotationArcs(bx,by,pH);
+    // Panel (rotating to face sun)
+    let ang=0;
+    if(!isNight){const dx=sunX-bx,dy=(by-pH)-sunY; ang=Math.atan2(dx,-dy)*.82;}
+    ctx.save(); ctx.translate(bx,by-pH); ctx.rotate(ang);
+    const pw=Math.min(W*.165,112),ph2=pw*.64;
+    // Drop shadow
+    ctx.save(); ctx.translate(5,5); ctx.fillStyle='rgba(0,0,0,.28)'; ctx.fillRect(-pw/2-3,-ph2/2-3,pw+6,ph2+6); ctx.restore();
+    // Dark frame
+    ctx.fillStyle='#1A237E'; ctx.fillRect(-pw/2-3,-ph2/2-3,pw+6,ph2+6);
+    // Blue surface
+    const spg=ctx.createLinearGradient(-pw/2,-ph2/2,pw/2,ph2/2);
+    spg.addColorStop(0,'#1565C0'); spg.addColorStop(.4,'#1976D2'); spg.addColorStop(1,'#0D47A1');
+    ctx.fillStyle=spg; ctx.fillRect(-pw/2,-ph2/2,pw,ph2);
+    // Grid lines
+    ctx.strokeStyle='rgba(66,165,245,.60)'; ctx.lineWidth=.8;
+    for(let c=1;c<4;c++){ctx.beginPath();ctx.moveTo(-pw/2+(pw/4)*c,-ph2/2);ctx.lineTo(-pw/2+(pw/4)*c,ph2/2);ctx.stroke();}
+    for(let r=1;r<3;r++){ctx.beginPath();ctx.moveTo(-pw/2,-ph2/2+(ph2/3)*r);ctx.lineTo(pw/2,-ph2/2+(ph2/3)*r);ctx.stroke();}
+    // Shine
+    const shn=ctx.createLinearGradient(-pw/2,-ph2/2,pw*.3,ph2*.3);
+    shn.addColorStop(0,'rgba(144,202,249,.42)'); shn.addColorStop(.6,'rgba(144,202,249,.10)'); shn.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=shn; ctx.fillRect(-pw/2,-ph2/2,pw,ph2);
+    // Border
+    ctx.strokeStyle='#0D47A1'; ctx.lineWidth=2.5; ctx.strokeRect(-pw/2,-ph2/2,pw,ph2);
+    ctx.restore();
+    // Yellow cable
+    ctx.beginPath(); ctx.moveTo(bx+7,by-pH);
+    ctx.bezierCurveTo(bx+27,by-pH+26,bx+20,by-pH+pH*.72,bx+8,by-14);
+    ctx.strokeStyle='#FFD600'; ctx.lineWidth=2; ctx.stroke();
+  }
+
+  // ── Countdown: พระอาทิตย์ขึ้น/ตก ──
+  function getCountdown(hours){
+    function fmt(rem){
+      const h=Math.floor(rem),m=Math.floor((rem-h)*60),s=Math.floor(((rem-h)*60-m)*60);
+      return (h>0?h+' ชม. ':'')+m+' นาที '+s+' วิ';
+    }
+    if(hours<6)   return '🌅 พระอาทิตย์ขึ้นในอีก '+fmt(6-hours);
+    if(hours<=18) return '🌇 พระอาทิตย์ตกในอีก '+fmt(18-hours);
+    return '🌅 พระอาทิตย์ขึ้น (พรุ่งนี้) ในอีก '+fmt(30-hours);
+  }
+
+  let prevTs=0;
+  function frame(ts){
+    const now=new Date();
+    const hours=now.getHours()+now.getMinutes()/60+now.getSeconds()/3600;
+    const rawT=(hours-6)/12, t=Math.max(0,Math.min(1,rawT));
+    const daytime=rawT>=0&&rawT<=1;
+    const dt=ts-prevTs; prevTs=ts;
+
+    ctx.clearRect(0,0,W,H);
+    drawSky(rawT,t);
+    drawStarsAndMoon(rawT);
+
+    let sunX=-9999,sunY=-9999;
+    if(daytime){
+      sunX=lerp(W*.88,W*.12,t);
+      sunY=H*.70-Math.sin(Math.PI*t)*H*.56;
+      drawSun(sunX,sunY,rawT);
+    }
+
+    clouds.forEach(c=>{
+      if(daytime){c.x-=c.spd*dt; if(c.x<-.15)c.x=1.15;}
+      if(daytime&&rawT>.08&&rawT<.92) drawCloud(c.x,c.y,c.w);
+    });
+
+    drawTerrain();
+    drawSign(W*.11,groundY(.10),'ทิศตะวันตก','left');
+    drawSign(W*.89,groundY(.90),'ทิศตะวันออก','right');
+    drawPanel(sunX,sunY,!daytime);
+
+    // Update widgets
+    document.getElementById('solarProgress').style.width=(t*100)+'%';
+    document.getElementById('solarClock').textContent=now.toLocaleTimeString('th-TH');
+    const cd=document.getElementById('solarCountdown');
+    if(cd) cd.textContent=getCountdown(hours);
+
+    requestAnimationFrame(frame);
+  }
+
+  window.addEventListener('resize',resize);
+  resize();
+  requestAnimationFrame(frame);
+})();
+
+/* ══════════════════════════════════════════════
+   📈  HISTORY PAGE — Google Sheets API
+   ══════════════════════════════════════════════ */
+const HIST_CFG = {
+  CLIENT_ID:      '374811030460-dl6njh725aa8kv67mkuol21qtc0t4to7.apps.googleusercontent.com',
+  SPREADSHEET_ID: '1ig9cydMtWy1bOYgHv2XTpYtB9WyC9zFN-aXouQUhfGo',
+  SHEET_NAME:     'ข้อมูลที่ได้รับจาก Ss',
+  SCOPE:          'https://www.googleapis.com/auth/spreadsheets',
+};
+
+let gToken       = null;
+let gTokenClient = null;
+let histCharts   = {};
+let autoRefTimer = null;
+
+// ── Init Google Identity Services ──
+function initGIS() {
+  if (typeof google === 'undefined' || !google.accounts) { setTimeout(initGIS, 600); return; }
+  gTokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: HIST_CFG.CLIENT_ID,
+    scope: HIST_CFG.SCOPE,
+    callback: function(resp) {
+      if (resp.error) { setHistStatus('เชื่อมต่อ Google ไม่สำเร็จ: ' + resp.error, 'err'); return; }
+      gToken = resp.access_token;
+      document.getElementById('histAuthBtn').style.display    = 'none';
+      document.getElementById('histControls').style.display   = 'flex';
+      fetchSheetData();
+    }
+  });
+}
+
+function connectGoogle() {
+  if (!gTokenClient) { setHistStatus('กำลังโหลด Google API — กรุณารอสักครู่', 'warn'); return; }
+  gTokenClient.requestAccessToken({ prompt: 'consent' });
+}
+
+// ── Fetch data from Sheets API v4 ──
+async function fetchSheetData() {
+  if (!gToken) return;
+  setHistLoading(true);
+  setHistStatus('กำลังดึงข้อมูลจาก Google Sheets...', 'info');
+  try {
+    const range = encodeURIComponent(HIST_CFG.SHEET_NAME + '!A:Z');
+    const url   = 'https://sheets.googleapis.com/v4/spreadsheets/' +
+                  HIST_CFG.SPREADSHEET_ID + '/values/' + range;
+    const res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + gToken } });
+
+    if (res.status === 401) {
+      gToken = null;
+      document.getElementById('histAuthBtn').style.display  = 'block';
+      document.getElementById('histControls').style.display = 'none';
+      setHistLoading(false);
+      setHistStatus('Token หมดอายุ — กรุณากดเชื่อมต่อใหม่', 'err');
+      return;
+    }
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const json = await res.json();
+    processRows(json.values || []);
+    fetchHarvestStats();          // ดึง KPI harvest+revenue แยก
+  } catch(e) {
+    setHistStatus('เกิดข้อผิดพลาด: ' + e.message, 'err');
+  }
+  setHistLoading(false);
+}
+
+// ── Fetch harvest & revenue KPI from สรุปข้อมูลแบบเฉลี่ย ──
+// 🌱 Harvest = merged cells H3:J10  → value at H3 = col 0 of range H1:M10
+// 💵 Revenue = merged cells K3:M10  → value at K3 = col 3 of range H1:M10
+async function fetchHarvestStats() {
+  if (!gToken) return;
+  try {
+    const range = encodeURIComponent('สรุปข้อมูลแบบเฉลี่ย!H1:M10');
+    const url   = 'https://sheets.googleapis.com/v4/spreadsheets/' +
+                  HIST_CFG.SPREADSHEET_ID + '/values/' + range +
+                  '?valueRenderOption=FORMATTED_VALUE';
+    const res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + gToken } });
+    if (!res.ok) return;
+    const json = await res.json();
+    const rows = json.values || [];
+
+    // Scan rows 2-10 (skip row 1 = header), find first non-empty cell
+    // Col 0 in range = column H (harvest), Col 3 in range = column K (revenue)
+    let harvestVal = '—';
+    let revenueVal = '—';
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i] || [];
+      if (harvestVal === '—' && row[0] && row[0].toString().trim()) {
+        harvestVal = row[0].toString().trim();
+      }
+      if (revenueVal === '—' && row[3] && row[3].toString().trim()) {
+        revenueVal = row[3].toString().trim();
+      }
+      if (harvestVal !== '—' && revenueVal !== '—') break;
+    }
+
+    const hEl  = document.getElementById('heroHarvest');
+    const rEl  = document.getElementById('heroRevenue');
+    const hTs  = document.getElementById('heroHarvestTs');
+    const rTs  = document.getElementById('heroRevenueTs');
+    const grid = document.getElementById('histHeroGrid');
+    const now  = new Date().toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'});
+
+    if (hEl) { hEl.textContent = harvestVal; if (hTs) hTs.textContent = now; }
+    if (rEl) { rEl.textContent = revenueVal; if (rTs) rTs.textContent = now; }
+    if (grid) grid.style.display = 'grid';
+
+  } catch(e) { console.warn('fetchHarvestStats error:', e); }
+}
+
+// ── Parse rows & render charts ──
+function processRows(rows) {
+  if (rows.length < 2) { setHistStatus('ไม่พบข้อมูลในชีต', 'warn'); return; }
+
+  const hdr   = rows[0].map(function(h){ return h.toString().trim().toLowerCase(); });
+  const iTs   = hdr.findIndex(function(h){ return h.includes('timestamp') || h.includes('time') || h.includes('เวลา'); });
+  const iTemp = hdr.findIndex(function(h){ return h.includes('temp'); });
+  const iHum  = hdr.findIndex(function(h){ return h.includes('hum') || h.includes('rh'); });
+  const iLdr1 = hdr.findIndex(function(h){ return (h.includes('ldr') || h.includes('east') || h.includes('lux')) && !h.includes('west') && !h.includes('2'); });
+  const iLdr2 = hdr.findIndex(function(h){ return h.includes('west') || (h.includes('ldr') && h.includes('2')); });
+
+  // Date filter
+  const filter = document.getElementById('histFilter').value;
+  const now = Date.now();
+  const cutoff = { '1d': 86400000, '7d': 604800000, '30d': 2592000000 }[filter];
+
+  var data = rows.slice(1).filter(function(r) {
+    if (!cutoff || iTs < 0 || !r[iTs]) return true;
+    const d = new Date(r[iTs]);
+    return !isNaN(d) && (now - d.getTime()) <= cutoff;
+  });
+
+  // Limit to latest 600 rows for performance
+  if (data.length > 600) data = data.slice(-600);
+
+  function pick(r, i) { if (i < 0 || r[i] === undefined || r[i] === '') return null; const v = parseFloat(r[i]); return isNaN(v) ? null : v; }
+
+  const labels   = data.map(function(r){ return iTs >= 0 ? fmtTs(r[iTs]) : ''; });
+  const tempArr  = data.map(function(r){ return pick(r, iTemp); });
+  const humArr   = data.map(function(r){ return pick(r, iHum); });
+  const ldr1Arr  = data.map(function(r){ return pick(r, iLdr1); });
+  const ldr2Arr  = data.map(function(r){ return pick(r, iLdr2); });
+
+  renderChart('chartTemp',  labels, tempArr,  'Temperature (°C)', '#ef5350');
+  renderChart('chartHum',   labels, humArr,   'Humidity (%RH)',    '#29b6f6');
+  renderChart('chartLdr1',  labels, ldr1Arr,  'LDR East (Lux)',    '#ffa726');
+  renderChart('chartLdr2',  labels, ldr2Arr,  'LDR West (Lux)',    '#ffee58');
+
+  updateSumCards('temp',  tempArr,  '°C');
+  updateSumCards('hum',   humArr,   '%RH');
+  updateSumCards('ldr1',  ldr1Arr,  'Lux');
+  updateSumCards('ldr2',  ldr2Arr,  'Lux');
+
+  document.getElementById('histLastUpd').textContent = new Date().toLocaleString('th-TH');
+  setHistStatus('โหลดสำเร็จ · ' + data.length + ' แถว · อัปเดต ' + new Date().toLocaleTimeString('th-TH'), 'ok');
+}
+
+function fmtTs(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  if (isNaN(d)) return ts.toString();
+  return d.toLocaleDateString('th-TH',{month:'short',day:'numeric'}) + ' ' +
+         d.toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'});
+}
+
+function renderChart(id, labels, data, label, color) {
+  const canvas = document.getElementById(id);
+  if (!canvas) return;
+  const pointR = labels.length > 150 ? 0 : 2;
+  const fill   = color.startsWith('#') ?
+    hexToRgba(color, 0.10) : color.replace(')', ',0.10)').replace('rgb','rgba');
+
+  if (histCharts[id]) {
+    histCharts[id].data.labels              = labels;
+    histCharts[id].data.datasets[0].data   = data;
+    histCharts[id].data.datasets[0].pointRadius = pointR;
+    histCharts[id].update('none');
+    return;
+  }
+
+  histCharts[id] = new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{ label: label, data: data, borderColor: color,
+        backgroundColor: fill, borderWidth: 2,
+        pointRadius: pointR, pointHoverRadius: 5,
+        tension: 0.35, fill: true, spanGaps: true }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      animation: { duration: 300 },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#0f1f13', borderColor: color, borderWidth: 1,
+          titleColor: '#e8f5e9', bodyColor: color,
+          callbacks: {
+            title: function(ctx){ return ctx[0].label; },
+            label: function(ctx){ return ' ' + (ctx.parsed.y !== null ? ctx.parsed.y.toFixed(2) : '—') + ' '; }
+          }
+        }
+      },
+      scales: {
+        x: { ticks: { color:'#6a9a74', font:{size:10}, maxTicksLimit:10, maxRotation:40 },
+             grid: { color:'rgba(0,230,118,.05)' } },
+        y: { ticks: { color:'#6a9a74', font:{size:11} },
+             grid: { color:'rgba(0,230,118,.05)' } }
+      }
+    }
+  });
+}
+
+function hexToRgba(hex, a) {
+  const n = parseInt(hex.replace('#',''), 16);
+  return 'rgba('+(n>>16)+','+((n>>8)&255)+','+(n&255)+','+a+')';
+}
+
+function updateSumCards(key, arr, unit) {
+  const valid = arr.filter(function(v){ return v !== null && !isNaN(v); });
+  const last  = document.getElementById('hs-last-' + key);
+  const avg   = document.getElementById('hs-avg-'  + key);
+  const min   = document.getElementById('hs-min-'  + key);
+  const max   = document.getElementById('hs-max-'  + key);
+  if (!valid.length) return;
+  const avg_v = valid.reduce(function(a,b){return a+b;},0) / valid.length;
+  if (last) last.textContent = valid[valid.length-1].toFixed(1) + ' ' + unit;
+  if (avg)  avg.textContent  = 'เฉลี่ย ' + avg_v.toFixed(1);
+  if (min)  min.textContent  = 'Min ' + Math.min.apply(null, valid).toFixed(1);
+  if (max)  max.textContent  = 'Max ' + Math.max.apply(null, valid).toFixed(1);
+}
+
+// ── Summary card border colors ──
+(function(){
+  var cols = {sumTemp:'#ef5350',sumHum:'#29b6f6',sumLdr1:'#ffa726',sumLdr2:'#ffee58'};
+  Object.keys(cols).forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) el.style.borderColor = cols[id] + '55';
+  });
+})();
+
+// ── Auto-refresh ──
+function toggleAutoRefresh() {
+  const btn = document.getElementById('autoRefBtn');
+  if (autoRefTimer) {
+    clearInterval(autoRefTimer); autoRefTimer = null;
+    if (btn) { btn.classList.remove('ar-on'); btn.innerHTML = '<i class="fas fa-clock"></i> Auto 5 นาที'; }
+  } else {
+    autoRefTimer = setInterval(fetchSheetData, 300000);
+    if (btn) { btn.classList.add('ar-on'); btn.innerHTML = '<i class="fas fa-clock fa-spin"></i> Auto: เปิด'; }
+  }
+}
+
+// ── Helper ──
+function setHistLoading(show) {
+  var el = document.getElementById('histLoader'); if (el) el.style.display = show ? 'flex' : 'none';
+}
+function setHistStatus(msg, type) {
+  var el = document.getElementById('histStatus'); if (!el) return;
+  var icon = {ok:'circle-check', err:'triangle-exclamation', info:'circle-info', warn:'triangle-exclamation'}[type] || 'circle-info';
+  el.innerHTML = '<i class="fas fa-' + icon + '"></i> ' + msg;
+  el.className = 'hist-status ' + (type || '');
+}
+
+// ── Tab switching ──
+function switchTab(tab) {
+  document.getElementById('pageDash').style.display    = (tab === 'main')    ? 'block' : 'none';
+  document.getElementById('pageHistory').style.display = (tab === 'history') ? 'block' : 'none';
+  document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.remove('active'); });
+  var btn = document.getElementById('tab-' + tab); if (btn) btn.classList.add('active');
+}
+
+// Init GIS on load
+initGIS();
+
+/* ══════════════════════════════════════════════
+   🔐  LOGIN SYSTEM
+   ══════════════════════════════════════════════ */
+(async function initLogin() {
+  // Spawn floating particles
+  const pc = document.getElementById('lpParticles');
+  if (pc) {
+    for (let i = 0; i < 18; i++) {
+      const d = document.createElement('div');
+      d.className = 'lp-p';
+      const sz = 40 + Math.random() * 120;
+      d.style.cssText = `
+        width:${sz}px; height:${sz}px;
+        left:${Math.random()*100}%;
+        animation-duration:${8+Math.random()*14}s;
+        animation-delay:${-Math.random()*16}s;
+        opacity:${.06+Math.random()*.18};
+      `;
+      pc.appendChild(d);
+    }
+  }
+
+  // ── เช็ค PHP session (ถ้า login อยู่แล้ว ข้ามหน้า login เลย) ──
+  try {
+    const res  = await fetch('api/me.php', { credentials: 'include' });
+    const data = await res.json();
+    if (data.ok) { showDashboard(data.username); return; }
+  } catch(e) { /* XAMPP อาจไม่ได้รัน — ใช้โหมด offline ก็ได้ */ }
+
+  const userEl = document.getElementById('lpUser');
+  if (userEl) userEl.focus();
+})();
+
+function togglePass() {
+  const inp = document.getElementById('lpPass');
+  const ico = document.getElementById('lpEyeIcon');
+  if (!inp || !ico) return;
+  if (inp.type === 'password') {
+    inp.type = 'text';
+    ico.className = 'fas fa-eye-slash';
+  } else {
+    inp.type = 'password';
+    ico.className = 'fas fa-eye';
+  }
+}
+
+/* ── Auth tab switch ── */
+function switchAuthTab(tab) {
+  document.getElementById('formLogin').style.display    = tab === 'login'    ? '' : 'none';
+  document.getElementById('formRegister').style.display = tab === 'register' ? '' : 'none';
+  document.getElementById('tabLogin').classList.toggle('active',    tab === 'login');
+  document.getElementById('tabRegister').classList.toggle('active', tab === 'register');
+  document.getElementById('lpError').classList.remove('show');
+  document.getElementById('rgError').classList.remove('show');
+  document.getElementById('rgSuccess').style.display = 'none';
+}
+
+/* ── Login (PHP API) ── */
+async function doLogin() {
+  const btn    = document.getElementById('lpBtn');
+  const errBox = document.getElementById('lpError');
+  const errMsg = document.getElementById('lpErrorMsg');
+  const username = (document.getElementById('lpUser').value || '').trim();
+  const password = (document.getElementById('lpPass').value || '');
+
+  errBox.classList.remove('show');
+  if (!username || !password) {
+    errMsg.textContent = 'กรุณากรอกชื่อผู้ใช้และรหัสผ่าน';
+    errBox.classList.add('show'); return;
+  }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="lp-spin"></span> กำลังตรวจสอบ...';
+
+  try {
+    const res  = await fetch('api/login.php', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    const data = await res.json();
+
+    if (data.ok) {
+      showDashboard(data.username);
+    } else {
+      errMsg.textContent = data.msg || 'เข้าสู่ระบบไม่สำเร็จ';
+      errBox.classList.add('show');
+      document.getElementById('lpPass').value = '';
+      document.getElementById('lpPass').focus();
+    }
+  } catch(e) {
+    errMsg.textContent = 'ไม่สามารถเชื่อมต่อ Server ได้ (ตรวจสอบว่า XAMPP ทำงานอยู่)';
+    errBox.classList.add('show');
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = '<i class="fas fa-right-to-bracket"></i> เข้าสู่ระบบ';
+}
+
+/* ── Register (PHP API) ── */
+async function doRegister() {
+  const btn     = document.getElementById('rgBtn');
+  const errBox  = document.getElementById('rgError');
+  const errMsg  = document.getElementById('rgErrorMsg');
+  const sucBox  = document.getElementById('rgSuccess');
+  const sucMsg  = document.getElementById('rgSuccessMsg');
+  errBox.classList.remove('show');
+  sucBox.style.display = 'none';
+
+  const username = (document.getElementById('rgUser').value    || '').trim();
+  const email    = (document.getElementById('rgEmail').value   || '').trim();
+  const password =  document.getElementById('rgPass').value    || '';
+  const confirm  =  document.getElementById('rgConfirm').value || '';
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="lp-spin"></span> กำลังสมัคร...';
+
+  try {
+    const res  = await fetch('api/register.php', {
+      method: 'POST', credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, email, password, confirm })
+    });
+    const data = await res.json();
+
+    if (data.ok) {
+      sucMsg.textContent = data.msg;
+      sucBox.style.display = 'flex';
+      ['rgUser','rgEmail','rgPass','rgConfirm'].forEach(id => document.getElementById(id).value = '');
+      setTimeout(() => switchAuthTab('login'), 2000);
+    } else {
+      errMsg.textContent = data.msg;
+      errBox.classList.add('show');
+    }
+  } catch(e) {
+    errMsg.textContent = 'ไม่สามารถเชื่อมต่อ Server ได้';
+    errBox.classList.add('show');
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = '<i class="fas fa-user-plus"></i> สมัครสมาชิก';
+}
+
+function showDashboard(username) {
+  // Hide overlay with fade
+  const ov = document.getElementById('loginOverlay');
+  if (ov) {
+    ov.style.transition = 'opacity .45s ease';
+    ov.style.opacity = '0';
+    setTimeout(() => ov.classList.add('hidden'), 460);
+  }
+  // Show user badge in header
+  const badge = document.getElementById('hdrUserBadge');
+  const av    = document.getElementById('hdrUserAv');
+  const name  = document.getElementById('hdrUserName');
+  const logoutBtn = document.getElementById('logoutBtn');
+  if (badge) badge.classList.add('show');
+  if (av)    av.textContent = username.charAt(0).toUpperCase();
+  if (name)  name.textContent = username;
+  if (logoutBtn) logoutBtn.style.display = 'block';
+  // Start MQTT for sensors
+  connectMQTT();
+}
+
+async function doLogout() {
+  try { await fetch('api/logout.php', { credentials: 'include' }); } catch(e) {}
+  if (typeof mqttClient !== 'undefined' && mqttClient) {
+    try { mqttClient.end(true); } catch(e) {}
+  }
+  location.reload();
+}
+
+/* ══════ Init ══════ */
+// connectMQTT() is now called from showDashboard() after login
+
+/* ══════════════════════════════════════════════
+   🌾  HARVEST SYSTEM
+   ══════════════════════════════════════════════ */
+let hvProductCount = 0;
+let hvTotalPrice   = 0;
+
+async function openHarvestModal() {
+  const overlay  = document.getElementById('hvOverlay');
+  const loading  = document.getElementById('hvLoading');
+  const result   = document.getElementById('hvDataResult');
+  const confirmB = document.getElementById('hvConfirmBtn');
+
+  // Reset state
+  loading.innerHTML = '<div class="hv-spin"></div><span>กำลังดึงข้อมูลจาก Google Sheets...</span>';
+  loading.style.display  = 'flex';
+  result.style.display   = 'none';
+  confirmB.disabled = true;
+  overlay.classList.add('hv-show');
+
+  if (!gToken) {
+    loading.innerHTML = '<i class="fas fa-triangle-exclamation" style="color:#ffa726;font-size:18px"></i>&nbsp;<span>ต้องเชื่อมต่อ Google Sheets ก่อน<br><small>ไปที่แถบ "ประวัติข้อมูล" แล้วกด เชื่อมต่อ Google Sheets</small></span>';
+    return;
+  }
+
+  try {
+    const res = await fetchProductionData();
+    hvProductCount = res.count;
+    hvTotalPrice   = res.total;
+    document.getElementById('hvCount').textContent = res.count + ' ต้น';
+    document.getElementById('hvPrice').textContent = res.total.toLocaleString('th-TH') + ' บาท';
+    loading.style.display = 'none';
+    result.style.display  = 'block';
+    confirmB.disabled = false;
+  } catch(e) {
+    loading.innerHTML = '<i class="fas fa-circle-exclamation" style="color:#ef5350;font-size:18px"></i>&nbsp;<span>ดึงข้อมูลไม่สำเร็จ: ' + e.message + '</span>';
+  }
+}
+
+function closeHarvestModal(e) {
+  if (e && e.target !== document.getElementById('hvOverlay')) return;
+  document.getElementById('hvOverlay').classList.remove('hv-show');
+}
+
+async function confirmHarvest() {
+  const confirmB = document.getElementById('hvConfirmBtn');
+  confirmB.disabled = true;
+  confirmB.innerHTML = '<div class="hv-spin" style="width:14px;height:14px;border-width:2px;margin:0 6px 0 0;flex-shrink:0"></div> กำลังบันทึก...';
+
+  // เขียนแถวสรุปลง Google Sheet ก่อน
+  let writeOk = false;
+  try {
+    await writeHarvestSummary(hvProductCount, hvTotalPrice);
+    writeOk = true;
+  } catch(e) {
+    console.warn('writeHarvestSummary error:', e);
+  }
+
+  document.getElementById('hvOverlay').classList.remove('hv-show');
+  const now = new Date().toLocaleString('th-TH', {dateStyle:'medium', timeStyle:'short'});
+  document.getElementById('hvSuccessCount').textContent = hvProductCount;
+  document.getElementById('hvSuccessPrice').textContent = hvTotalPrice.toLocaleString('th-TH');
+  document.getElementById('hvSumCount').textContent     = hvProductCount;
+  document.getElementById('hvSumPrice').textContent     = hvTotalPrice.toLocaleString('th-TH');
+  document.getElementById('hvSuccessTs').textContent    =
+    (writeOk ? '✅ บันทึกลง Google Sheets แล้ว · ' : '⚠️ แสดงผลสำเร็จ (บันทึก Sheet ไม่สำเร็จ) · ') + now;
+  document.getElementById('hvSuccessOverlay').classList.add('hv-show');
+
+  confirmB.disabled = false;
+  confirmB.innerHTML = '<i class="fas fa-check"></i> ยืนยันเก็บเกี่ยว';
+  startConfetti();
+}
+
+function closeHarvestSuccess() {
+  document.getElementById('hvSuccessOverlay').classList.remove('hv-show');
+  stopConfetti();
+}
+
+async function fetchProductionData() {
+  const sn  = encodeURIComponent('ข้อมูลผลผลิต');
+  const url = 'https://sheets.googleapis.com/v4/spreadsheets/' +
+              HIST_CFG.SPREADSHEET_ID + '/values/' + sn + '!A:C' +
+              '?valueRenderOption=FORMATTED_VALUE';
+  const res = await fetch(url, { headers: { 'Authorization': 'Bearer ' + gToken } });
+  if (res.status === 401) { gToken = null; throw new Error('Token หมดอายุ กรุณาเชื่อมต่อ Google ใหม่'); }
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const json = await res.json();
+  const rows = json.values || [];
+
+  // หา "สรุป..." แถวล่าสุด แล้วนับใหม่จากแถวถัดไปเท่านั้น
+  let lastSummaryIdx = 0;
+  for (let i = 1; i < rows.length; i++) {
+    const a = (rows[i][0] || '').toString().trim();
+    if (a.includes('สรุป') || a.toLowerCase().includes('sum')) {
+      lastSummaryIdx = i;
+    }
+  }
+
+  let count = 0, total = 0;
+  for (let i = lastSummaryIdx + 1; i < rows.length; i++) {
+    const row = rows[i] || [];
+    const a   = (row[0] || '').toString().trim();
+    if (!a) continue; // ข้ามแถวว่าง
+    count++;
+    // Column C = price — strip non-numeric chars (บาท, ฿, spaces, B)
+    const raw = (row[2] || '').toString().replace(/[^0-9.]/g, '');
+    const v   = parseFloat(raw);
+    if (!isNaN(v)) total += v;
+  }
+  return { count, total };
+}
+
+// เขียนแถวสรุปใหม่ลงท้ายชีต + จัด format (merge, bold, yellow bg, center)
+async function writeHarvestSummary(count, total) {
+  const summaryText = 'สรุปการเก็บเกี่ยว' + count + 'ต้น ทั้งหมด ' + total + 'บาท';
+  const PROD_SHEET_ID = 1702725714; // gid ของชีต "ข้อมูลผลผลิต"
+
+  // ── Step 1: Append ข้อความ ──
+  const appendUrl = 'https://sheets.googleapis.com/v4/spreadsheets/' +
+                    HIST_CFG.SPREADSHEET_ID + '/values/' +
+                    encodeURIComponent('ข้อมูลผลผลิต!A:A') +
+                    ':append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS';
+  const appendRes = await fetch(appendUrl, {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + gToken, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ values: [[summaryText]] }),
+  });
+  if (appendRes.status === 401) { gToken = null; throw new Error('Token หมดอายุ'); }
+  if (!appendRes.ok) throw new Error('Append HTTP ' + appendRes.status);
+  const appendJson = await appendRes.json();
+
+  // หาหมายเลขแถวที่เพิ่งเขียน จาก updatedRange เช่น "'ข้อมูลผลผลิต'!A11:A11"
+  const updatedRange = (appendJson.updates || {}).updatedRange || '';
+  const rowMatch = updatedRange.match(/[A-Z]+(\d+)/);
+  if (!rowMatch) return appendJson;
+  const rowIndex = parseInt(rowMatch[1]) - 1; // 0-based
+
+  // ── Step 2: batchUpdate — merge A:C + format ──
+  const fmtUrl = 'https://sheets.googleapis.com/v4/spreadsheets/' +
+                 HIST_CFG.SPREADSHEET_ID + ':batchUpdate';
+  await fetch(fmtUrl, {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + gToken, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      requests: [
+        // Merge columns A, B, C ในแถวสรุป
+        {
+          mergeCells: {
+            range: {
+              sheetId: PROD_SHEET_ID,
+              startRowIndex: rowIndex, endRowIndex: rowIndex + 1,
+              startColumnIndex: 0,    endColumnIndex: 3,
+            },
+            mergeType: 'MERGE_ALL',
+          }
+        },
+        // จัด format: พื้นเหลือง, ตัวหนา, ขนาด 15, ตรงกลาง, ตัวอักษรดำ
+        {
+          repeatCell: {
+            range: {
+              sheetId: PROD_SHEET_ID,
+              startRowIndex: rowIndex, endRowIndex: rowIndex + 1,
+              startColumnIndex: 0,    endColumnIndex: 3,
+            },
+            cell: {
+              userEnteredFormat: {
+                backgroundColor: { red: 1, green: 1, blue: 0 },
+                horizontalAlignment: 'CENTER',
+                verticalAlignment:   'MIDDLE',
+                textFormat: {
+                  bold: true,
+                  fontSize: 15,
+                  foregroundColor: { red: 0, green: 0, blue: 0 },
+                },
+              }
+            },
+            fields: 'userEnteredFormat(backgroundColor,horizontalAlignment,verticalAlignment,textFormat)',
+          }
+        }
+      ]
+    }),
+  });
+
+  return appendJson;
+}
+
+/* ── Confetti ── */
+let confettiAnim = null;
+const CONFETTI_COLS = ['#00e676','#ffee58','#ffa726','#29b6f6','#ef5350','#ab47bc','#ffffff'];
+
+function startConfetti() {
+  const canvas = document.getElementById('hvConfettiCanvas');
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
+  const ctx = canvas.getContext('2d');
+
+  const pieces = Array.from({length:130}, () => ({
+    x: Math.random() * canvas.width,
+    y: Math.random() * canvas.height - canvas.height,
+    d: 1.5 + Math.random() * 2.8,
+    color: CONFETTI_COLS[Math.floor(Math.random() * CONFETTI_COLS.length)],
+    angle: 0,
+    tiltSpeed: .08 + Math.random() * .2,
+    w: 8 + Math.random() * 12,
+    h: 5 + Math.random() * 8,
+    isCircle: Math.random() > .6,
+    r: 4 + Math.random() * 6,
+  }));
+
+  function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    pieces.forEach(p => {
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.angle * Math.PI / 180);
+      ctx.fillStyle = p.color;
+      ctx.globalAlpha = .88;
+      if (p.isCircle) {
+        ctx.beginPath(); ctx.arc(0,0,p.r,0,Math.PI*2); ctx.fill();
+      } else {
+        ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h);
+      }
+      ctx.restore();
+      p.angle += p.tiltSpeed * 3;
+      p.y += p.d;
+      p.x += Math.sin(p.angle * .04) * 1.5;
+      if (p.y > canvas.height) { p.y = -12; p.x = Math.random() * canvas.width; }
+    });
+    confettiAnim = requestAnimationFrame(draw);
+  }
+  if (confettiAnim) cancelAnimationFrame(confettiAnim);
+  draw();
+}
+
+function stopConfetti() {
+  if (confettiAnim) { cancelAnimationFrame(confettiAnim); confettiAnim = null; }
+  const canvas = document.getElementById('hvConfettiCanvas');
+  if (canvas) canvas.getContext('2d').clearRect(0,0,canvas.width,canvas.height);
+}
+</script>
+
+<!-- ═══════════════ HARVEST CONFIRMATION MODAL ═══════════════ -->
+<div class="hv-overlay" id="hvOverlay" onclick="closeHarvestModal(event)">
+  <div class="hv-modal">
+    <div class="hv-modal-glow"></div>
+    <span class="hv-plant-wrap">🌾</span>
+    <div class="hv-title">ยืนยันการเก็บเกี่ยวผลผลิต</div>
+    <div class="hv-subtitle">ระบบจะดึงข้อมูลสดจากชีต "ข้อมูลผลผลิต"<br>และแสดงสรุปผลผลิตทั้งหมดที่รวบรวมไว้</div>
+
+    <div class="hv-data-box" id="hvDataBox">
+      <div class="hv-data-loading" id="hvLoading">
+        <div class="hv-spin"></div>
+        <span>กำลังดึงข้อมูลจาก Google Sheets...</span>
+      </div>
+      <div class="hv-data-result" id="hvDataResult">
+        <div class="hv-data-row">
+          <div class="hv-data-label"><i class="fas fa-seedling"></i>&nbsp; จำนวนต้นทั้งหมด</div>
+          <div class="hv-data-val" id="hvCount">—</div>
+        </div>
+        <div class="hv-data-row">
+          <div class="hv-data-label"><i class="fas fa-coins"></i>&nbsp; มูลค่ารวมทั้งหมด</div>
+          <div class="hv-data-val price" id="hvPrice">—</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="hv-modal-btns">
+      <button class="hv-btn-cancel" onclick="document.getElementById('hvOverlay').classList.remove('hv-show')">
+        <i class="fas fa-xmark"></i> ยกเลิก
+      </button>
+      <button class="hv-btn-confirm" id="hvConfirmBtn" onclick="confirmHarvest()" disabled>
+        <i class="fas fa-check"></i> ยืนยันเก็บเกี่ยว
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ HARVEST SUCCESS OVERLAY ═══════════════ -->
+<div class="hv-success-overlay" id="hvSuccessOverlay">
+  <canvas id="hvConfettiCanvas"></canvas>
+  <div class="hv-success-card">
+    <span class="hv-success-icon">🎉</span>
+    <div class="hv-success-title">เก็บเกี่ยวสำเร็จ!</div>
+    <div class="hv-success-sub">สรุปผลผลิตทั้งหมดของโรงเรือน RAIL Smart Farm</div>
+
+    <div class="hv-success-nums">
+      <div class="hv-snum-card">
+        <div class="hv-snum-label"><i class="fas fa-seedling"></i> จำนวนต้น</div>
+        <div class="hv-snum-value" id="hvSuccessCount">0</div>
+        <div class="hv-snum-unit">ต้น</div>
+      </div>
+      <div class="hv-snum-card gold">
+        <div class="hv-snum-label"><i class="fas fa-coins"></i> มูลค่ารวม</div>
+        <div class="hv-snum-value gold" id="hvSuccessPrice">0</div>
+        <div class="hv-snum-unit">บาท</div>
+      </div>
+    </div>
+
+    <div class="hv-success-summary">
+      สรุปการเก็บเกี่ยว
+      <span class="hv-sum-green" id="hvSumCount">0</span> ต้น
+      ทั้งหมด <span class="hv-sum-gold" id="hvSumPrice">0</span> บาท
+    </div>
+
+    <div class="hv-success-actions">
+      <a class="hv-sheet-btn"
+         href="https://docs.google.com/spreadsheets/d/1ig9cydMtWy1bOYgHv2XTpYtB9WyC9zFN-aXouQUhfGo/edit?usp=sharing"
+         target="_blank" rel="noopener">
+        <i class="fab fa-google"></i> เปิด Google Sheets
+      </a>
+      <button class="hv-close-btn" onclick="closeHarvestSuccess()">
+        <i class="fas fa-xmark"></i> ปิด
+      </button>
+    </div>
+    <div class="hv-success-ts" id="hvSuccessTs">—</div>
+  </div>
+</div>
+
+</body>
+</html>

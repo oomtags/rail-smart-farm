@@ -1,0 +1,16 @@
+# ── Credentials (ห้าม push ขึ้น GitHub) ──
+api/db.php
+
+# ── n8n workflows (อาจมี API key / LINE token) ──
+n8n-workflow-*.json
+
+# ── OS / Editor ──
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+*.swp
+*.swo
+
+# ── PHP cache ──
+*.log
