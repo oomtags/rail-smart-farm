@@ -2685,7 +2685,8 @@ async function fetchProductionData() {
   for (let i = lastSummaryIdx + 1; i < rows.length; i++) {
     const row = rows[i] || [];
     const a   = (row[0] || '').toString().trim();
-    if (!a) continue; // ข้ามแถวว่าง
+    const b   = (row[1] || '').toString().trim();
+    if (!b || b === '-') continue; // ข้ามแถวว่างและแถว dash separator
     count++;
     // Column C = price — strip non-numeric chars (บาท, ฿, spaces, B)
     const raw = (row[2] || '').toString().replace(/[^0-9.]/g, '');
