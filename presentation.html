@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RAIL Smart Farm — กะไสบ้านเฮา</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --green:#00e676;--dark:#0a1a0f;--card:#0f2318;--gold:#FFD600;
+  --text:#e8f5e9;--dim:#81c784;--red:#ef5350;--blue:#29b6f6;
+}
+body{font-family:'Sarabun',sans-serif;background:var(--dark);color:var(--text);
+  overflow:hidden;user-select:none;}
+
+/* ─── SLIDES ─── */
+.slides{width:100vw;height:100vh;position:relative;}
+.slide{position:absolute;inset:0;display:flex;flex-direction:column;
+  justify-content:center;align-items:center;padding:48px 64px;
+  opacity:0;pointer-events:none;transition:opacity .5s ease,transform .5s ease;
+  transform:translateX(60px);}
+.slide.active{opacity:1;pointer-events:all;transform:translateX(0);}
+.slide.prev{opacity:0;transform:translateX(-60px);}
+
+/* ─── BG PATTERNS ─── */
+.slide::before{content:'';position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(ellipse at 80% 20%,rgba(0,230,118,.07) 0%,transparent 60%),
+             radial-gradient(ellipse at 20% 80%,rgba(0,230,118,.05) 0%,transparent 60%);}
+.slide-1::after,.slide-10::after{content:'🌿';font-size:320px;position:absolute;
+  right:-40px;bottom:-60px;opacity:.04;pointer-events:none;}
+
+/* ─── COMMON ─── */
+.tag{display:inline-block;padding:4px 14px;border-radius:20px;font-size:13px;
+  font-weight:700;letter-spacing:.5px;margin-bottom:16px;}
+.tag-green{background:rgba(0,230,118,.15);color:var(--green);border:1px solid rgba(0,230,118,.3);}
+.tag-gold{background:rgba(255,214,0,.12);color:var(--gold);border:1px solid rgba(255,214,0,.3);}
+.tag-blue{background:rgba(41,182,246,.12);color:var(--blue);border:1px solid rgba(41,182,246,.3);}
+
+h1{font-size:clamp(28px,4vw,52px);font-weight:800;line-height:1.2;text-align:center;}
+h2{font-size:clamp(22px,3vw,38px);font-weight:700;line-height:1.3;text-align:center;}
+h3{font-size:clamp(16px,2vw,24px);font-weight:600;}
+p,li{font-size:clamp(14px,1.5vw,20px);line-height:1.7;color:var(--dim);}
+
+.accent{color:var(--green);}
+.gold{color:var(--gold);}
+.white{color:#fff;}
+
+.divider{width:60px;height:3px;background:linear-gradient(90deg,var(--green),transparent);
+  border-radius:2px;margin:16px auto;}
+
+/* ─── CARDS ─── */
+.cards{display:grid;gap:20px;width:100%;max-width:960px;margin-top:24px;}
+.cards-2{grid-template-columns:1fr 1fr;}
+.cards-3{grid-template-columns:1fr 1fr 1fr;}
+.cards-4{grid-template-columns:1fr 1fr 1fr 1fr;}
+.card{background:var(--card);border:1px solid rgba(0,230,118,.18);border-radius:16px;
+  padding:24px 20px;text-align:center;}
+.card-icon{font-size:36px;margin-bottom:10px;}
+.card h3{color:#fff;margin-bottom:6px;font-size:clamp(14px,1.5vw,18px);}
+.card p{font-size:clamp(12px,1.2vw,15px);color:var(--dim);}
+
+/* ─── FLOW ─── */
+.flow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+  justify-content:center;margin-top:24px;}
+.flow-box{background:var(--card);border:1px solid rgba(0,230,118,.25);
+  border-radius:12px;padding:14px 18px;text-align:center;min-width:110px;}
+.flow-box .fi{font-size:24px;display:block;margin-bottom:4px;}
+.flow-box span{font-size:13px;font-weight:600;color:#fff;}
+.flow-arrow{color:var(--green);font-size:20px;font-weight:700;}
+
+/* ─── PROBLEM ─── */
+.problem-list{list-style:none;max-width:700px;margin-top:20px;}
+.problem-list li{display:flex;align-items:flex-start;gap:14px;margin-bottom:16px;
+  background:rgba(239,83,80,.08);border:1px solid rgba(239,83,80,.2);
+  border-radius:12px;padding:16px 20px;}
+.problem-list li .ic{font-size:22px;flex-shrink:0;margin-top:2px;}
+.problem-list li div{font-size:clamp(14px,1.5vw,18px);color:var(--text);}
+
+/* ─── RESULT NUMS ─── */
+.nums{display:flex;gap:32px;justify-content:center;margin-top:28px;flex-wrap:wrap;}
+.num-box{text-align:center;}
+.num-box .n{font-size:clamp(36px,5vw,64px);font-weight:800;color:var(--green);
+  line-height:1;}
+.num-box .nl{font-size:14px;color:var(--dim);margin-top:4px;}
+
+/* ─── TECH PILLS ─── */
+.pills{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:20px;}
+.pill{padding:8px 18px;border-radius:30px;font-size:14px;font-weight:600;
+  border:1px solid rgba(0,230,118,.3);background:rgba(0,230,118,.08);color:var(--green);}
+.pill.gold{border-color:rgba(255,214,0,.3);background:rgba(255,214,0,.08);color:var(--gold);}
+.pill.blue{border-color:rgba(41,182,246,.3);background:rgba(41,182,246,.08);color:var(--blue);}
+
+/* ─── COMPARE TABLE ─── */
+.tbl{border-collapse:collapse;width:100%;max-width:860px;margin-top:20px;font-size:15px;}
+.tbl th{background:rgba(0,230,118,.12);color:var(--green);padding:12px 16px;
+  text-align:left;font-weight:700;border-bottom:2px solid rgba(0,230,118,.25);}
+.tbl td{padding:10px 16px;border-bottom:1px solid rgba(255,255,255,.06);color:var(--text);}
+.tbl tr:first-child td{color:#fff;font-weight:700;background:rgba(0,230,118,.06);}
+.ck{color:var(--green);font-size:18px;}
+.cx{color:#ef5350;font-size:18px;}
+
+/* ─── ROADMAP ─── */
+.roadmap{display:flex;flex-direction:column;gap:14px;max-width:700px;margin-top:20px;width:100%;}
+.rm{display:flex;align-items:center;gap:16px;background:var(--card);
+  border:1px solid rgba(0,230,118,.15);border-radius:12px;padding:16px 20px;}
+.rm-num{width:36px;height:36px;border-radius:50%;background:rgba(0,230,118,.15);
+  color:var(--green);font-weight:800;font-size:16px;display:flex;align-items:center;
+  justify-content:center;flex-shrink:0;}
+.rm div{font-size:clamp(13px,1.4vw,17px);color:var(--text);}
+.rm small{color:var(--dim);font-size:13px;}
+
+/* ─── NAV ─── */
+.nav{position:fixed;bottom:28px;left:50%;transform:translateX(-50%);
+  display:flex;align-items:center;gap:16px;z-index:100;
+  background:rgba(10,26,15,.85);backdrop-filter:blur(12px);
+  border:1px solid rgba(0,230,118,.2);border-radius:40px;padding:10px 24px;}
+.nav-btn{background:rgba(0,230,118,.12);border:1px solid rgba(0,230,118,.3);
+  color:var(--green);padding:8px 20px;border-radius:20px;font-size:15px;
+  font-family:inherit;font-weight:600;cursor:pointer;transition:.2s;}
+.nav-btn:hover{background:rgba(0,230,118,.25);}
+.nav-btn:disabled{opacity:.3;cursor:not-allowed;}
+.slide-counter{color:var(--dim);font-size:14px;min-width:60px;text-align:center;font-weight:600;}
+
+/* ─── PROGRESS ─── */
+.progress{position:fixed;top:0;left:0;height:3px;
+  background:linear-gradient(90deg,var(--green),#00bfa5);
+  transition:width .4s ease;z-index:200;}
+
+/* ─── LOGO BADGE ─── */
+.logo-badge{position:fixed;top:20px;left:24px;font-size:13px;font-weight:700;
+  color:var(--green);opacity:.6;z-index:100;letter-spacing:.5px;}
+
+/* ─── SLIDE 1: COVER ─── */
+.cover-logo{font-size:72px;margin-bottom:12px;
+  filter:drop-shadow(0 0 24px rgba(0,230,118,.4));}
+.cover-school{font-size:16px;color:var(--dim);margin-top:20px;font-weight:400;}
+.cover-badge{display:flex;gap:12px;justify-content:center;margin-top:16px;flex-wrap:wrap;}
+
+/* ─── SLIDE AI ─── */
+.ai-flow{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;
+  max-width:860px;margin-top:24px;width:100%;}
+.ai-card{background:var(--card);border-radius:14px;padding:20px;text-align:center;
+  border:1px solid rgba(0,230,118,.15);position:relative;}
+.ai-card::after{content:'';position:absolute;top:50%;right:-17px;
+  border:8px solid transparent;border-left-color:rgba(0,230,118,.4);
+  transform:translateY(-50%);}
+.ai-card:last-child::after{display:none;}
+.ai-card .ai-icon{font-size:32px;margin-bottom:8px;}
+.ai-card h4{color:#fff;font-size:15px;margin-bottom:4px;}
+.ai-card p{font-size:13px;color:var(--dim);}
+
+/* keyboard hint */
+.key-hint{position:fixed;bottom:80px;right:24px;font-size:12px;color:rgba(255,255,255,.2);}
+</style>
+</head>
+<body>
+
+<div class="progress" id="progress"></div>
+<div class="logo-badge">🌿 กะไสบ้านเฮา</div>
+<div class="key-hint">← → หรือ Space เพื่อเปลี่ยน slide</div>
+
+<div class="slides" id="slides">
+
+<!-- ══ SLIDE 1: COVER ══ -->
+<div class="slide slide-1 active">
+  <div class="cover-logo">🌾</div>
+  <div class="tag tag-green">ธีม : เกษตรกรรม</div>
+  <h1><span class="accent">โรงเรือนเกษตรอัจฉริยะ</span><br>RAIL Smart Farm Dashboard</h1>
+  <div class="divider"></div>
+  <div class="cover-badge">
+    <span class="tag tag-gold">ทีม กะไสบ้านเฮา</span>
+    <span class="tag tag-blue">โรงเรียนกมลาไสย จ.กาฬสินธุ์</span>
+  </div>
+  <p class="cover-school">โครงการนักประดิษฐ์หุ่นยนต์รุ่นเยาว์ฯ ครั้งที่ 11 · มหาวิทยาลัยราชภัฏยะลา</p>
+</div>
+
+<!-- ══ SLIDE 2: ปัญหา ══ -->
+<div class="slide slide-2">
+  <div class="tag tag-gold">ปัญหา</div>
+  <h2>เกษตรกรโรงเรือนเผชิญอะไรอยู่?</h2>
+  <div class="divider"></div>
+  <ul class="problem-list">
+    <li>
+      <span class="ic">🌡️</span>
+      <div><strong>ไม่รู้สภาพโรงเรือนแบบ Real-Time</strong><br>
+      ต้องเดินเช็คอุณหภูมิ ความชื้น แสงด้วยตัวเองทุกครั้ง</div>
+    </li>
+    <li>
+      <span class="ic">🌱</span>
+      <div><strong>ไม่ทราบว่าพืชพร้อมเก็บเกี่ยวเมื่อไหร่</strong><br>
+      ต้องอาศัยประสบการณ์ส่วนตัว เสี่ยงเก็บเร็วหรือช้าเกินไป</div>
+    </li>
+    <li>
+      <span class="ic">📋</span>
+      <div><strong>ไม่มีข้อมูลผลผลิตย้อนหลัง</strong><br>
+      ขาดการบันทึก ไม่สามารถวางแผนการปลูกในอนาคตได้</div>
+    </li>
+  </ul>
+</div>
+
+<!-- ══ SLIDE 3: วิธีแก้ ══ -->
+<div class="slide slide-3">
+  <div class="tag tag-green">วิธีแก้ปัญหา</div>
+  <h2>ระบบ <span class="accent">RAIL Smart Farm</span></h2>
+  <div class="divider"></div>
+  <div class="cards cards-3" style="max-width:860px;">
+    <div class="card">
+      <div class="card-icon">📡</div>
+      <h3>IoT Real-Time</h3>
+      <p>เซ็นเซอร์ Arduino ส่งค่าทุกวินาที ผ่าน MQTT เข้า Dashboard</p>
+    </div>
+    <div class="card">
+      <div class="card-icon">👁️</div>
+      <h3>AI ตรวจจับพืช</h3>
+      <p>กล้อง + DeepDetect แยกระยะ Seedling / Harvest อัตโนมัติ</p>
+    </div>
+    <div class="card">
+      <div class="card-icon">🤖</div>
+      <h3>AI Agent</h3>
+      <p>Farm Assistant วิเคราะห์ค่า sensor จริง ให้คำแนะนำทันที</p>
+    </div>
+  </div>
+  <div class="flow" style="margin-top:28px;">
+    <div class="flow-box"><span class="fi">🔌</span><span>Arduino</span></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box"><span class="fi">📶</span><span>MQTT</span></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box"><span class="fi">🖥️</span><span>Dashboard</span></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box"><span class="fi">🤖</span><span>Claude AI</span></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box"><span class="fi">📊</span><span>Sheets</span></div>
+  </div>
+</div>
+
+<!-- ══ SLIDE 4: Dashboard ══ -->
+<div class="slide slide-4">
+  <div class="tag tag-green">ฟีเจอร์หลัก</div>
+  <h2>Dashboard <span class="accent">Real-Time</span></h2>
+  <div class="divider"></div>
+  <div class="cards cards-4" style="max-width:960px;">
+    <div class="card">
+      <div class="card-icon">🌡️</div>
+      <h3>อุณหภูมิ</h3>
+      <p>อัพเดตทุกวินาที พร้อมกราฟย้อนหลัง</p>
+    </div>
+    <div class="card">
+      <div class="card-icon">💧</div>
+      <h3>ความชื้น</h3>
+      <p>ติดตาม %RH แบบ real-time</p>
+    </div>
+    <div class="card">
+      <div class="card-icon">☀️</div>
+      <h3>LDR / แสง</h3>
+      <p>Solar Tracker ติดตามทิศแสงอัตโนมัติ</p>
+    </div>
+    <div class="card">
+      <div class="card-icon">📷</div>
+      <h3>กล้อง AI</h3>
+      <p>Live feed พร้อม DeepDetect ตรวจพืช</p>
+    </div>
+  </div>
+  <p style="margin-top:24px;text-align:center;">
+    เข้าใช้งานได้จากทุกที่ ·
+    <span class="accent" style="font-weight:700;">oomtags.github.io/rail-smart-farm</span>
+  </p>
+</div>
+
+<!-- ══ SLIDE 5: AI Camera ══ -->
+<div class="slide slide-5">
+  <div class="tag tag-blue">Computer Vision</div>
+  <h2>กล้อง AI + <span class="accent">DeepDetect</span></h2>
+  <div class="divider"></div>
+  <div class="ai-flow">
+    <div class="ai-card">
+      <div class="ai-icon">📷</div>
+      <h4>กล้อง Rail-IMG07</h4>
+      <p>ส่งภาพผ่าน MQTT แบบ real-time</p>
+    </div>
+    <div class="ai-card">
+      <div class="ai-icon">🧠</div>
+      <h4>CIRA CORE / DeepDetect</h4>
+      <p>AI วิเคราะห์ภาพ จำแนก 3 คลาส</p>
+    </div>
+    <div class="ai-card">
+      <div class="ai-icon">📊</div>
+      <h4>บันทึกอัตโนมัติ</h4>
+      <p>ผลตรวจ → Google Sheets ทันที</p>
+    </div>
+  </div>
+  <div class="cards cards-3" style="max-width:660px;margin-top:20px;">
+    <div class="card" style="border-color:rgba(41,182,246,.3);">
+      <div style="font-size:28px;">🕳️</div>
+      <h3 style="color:var(--blue);">Hole</h3>
+      <p>ช่องว่างสำหรับปลูก</p>
+    </div>
+    <div class="card" style="border-color:rgba(0,230,118,.3);">
+      <div style="font-size:28px;">🌱</div>
+      <h3 style="color:var(--green);">Seedling</h3>
+      <p>กล้าพืชกำลังเจริญ</p>
+    </div>
+    <div class="card" style="border-color:rgba(255,214,0,.3);">
+      <div style="font-size:28px;">🥬</div>
+      <h3 style="color:var(--gold);">Harvest</h3>
+      <p>พร้อมเก็บเกี่ยว!</p>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SLIDE 6: AI Agent ══ -->
+<div class="slide slide-6">
+  <div class="tag tag-green">AI Agent</div>
+  <h2><span class="accent">Farm AI Assistant</span><br>ไม่ใช่แค่ Chatbot ธรรมดา</h2>
+  <div class="divider"></div>
+  <div class="cards cards-2" style="max-width:800px;">
+    <div class="card" style="text-align:left;">
+      <div style="font-size:28px;margin-bottom:10px;">🌡️</div>
+      <h3 style="color:#fff;margin-bottom:8px;">รับค่า Sensor จริง</h3>
+      <p>ดึงอุณหภูมิ ความชื้น แสง จาก MQTT แล้วส่งให้ AI วิเคราะห์</p>
+    </div>
+    <div class="card" style="text-align:left;">
+      <div style="font-size:28px;margin-bottom:10px;">💬</div>
+      <h3 style="color:#fff;margin-bottom:8px;">ตอบเฉพาะสถานการณ์</h3>
+      <p>ไม่ตอบทั่วไป — วิเคราะห์จากข้อมูลโรงเรือนนั้นๆ โดยตรง</p>
+    </div>
+    <div class="card" style="text-align:left;">
+      <div style="font-size:28px;margin-bottom:10px;">⚙️</div>
+      <h3 style="color:#fff;margin-bottom:8px;">n8n Automation</h3>
+      <p>Workflow อัตโนมัติ รับ–ประมวล–ตอบ ทุกขั้นตอนใน Pipeline</p>
+    </div>
+    <div class="card" style="text-align:left;">
+      <div style="font-size:28px;margin-bottom:10px;">🧠</div>
+      <h3 style="color:#fff;margin-bottom:8px;">Claude AI Engine</h3>
+      <p>ขับเคลื่อนด้วย Claude / Anthropic API ผ่าน n8n Cloud</p>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SLIDE 7: Harvest System ══ -->
+<div class="slide slide-7">
+  <div class="tag tag-gold">ระบบเก็บเกี่ยว</div>
+  <h2>บันทึกผลผลิต <span class="gold">อัตโนมัติ</span></h2>
+  <div class="divider"></div>
+  <div class="flow" style="margin-bottom:28px;">
+    <div class="flow-box"><span class="fi">👁️</span><span>AI ตรวจพืช</span></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box"><span class="fi">🌾</span><span>กดเก็บเกี่ยว</span></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box"><span class="fi">✅</span><span>ยืนยัน</span></div>
+    <div class="flow-arrow">→</div>
+    <div class="flow-box"><span class="fi">📊</span><span>Sheets บันทึก</span></div>
+  </div>
+  <div class="cards cards-3" style="max-width:760px;">
+    <div class="card">
+      <div class="card-icon">🥬</div>
+      <h3>จำนวนต้น</h3>
+      <p>นับจาก AI detection อัตโนมัติ</p>
+    </div>
+    <div class="card">
+      <div class="card-icon">💰</div>
+      <h3>มูลค่ารวม</h3>
+      <p>คำนวณราคา × จำนวน ทันที</p>
+    </div>
+    <div class="card">
+      <div class="card-icon">📅</div>
+      <h3>ประวัติย้อนหลัง</h3>
+      <p>Google Sheets เก็บข้อมูลทุกรอบ</p>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SLIDE 8: เทคโนโลยี ══ -->
+<div class="slide slide-8">
+  <div class="tag tag-blue">Technology Stack</div>
+  <h2>เครื่องมือที่ใช้</h2>
+  <div class="divider"></div>
+  <div class="pills">
+    <span class="pill">🔌 Arduino IDE</span>
+    <span class="pill">📶 MQTT Protocol</span>
+    <span class="pill">🧠 Claude AI</span>
+    <span class="pill">⚙️ n8n Cloud</span>
+    <span class="pill">🐍 Python</span>
+    <span class="pill">👁️ CIRA CORE / DeepDetect</span>
+    <span class="pill gold">📊 Google Sheets API</span>
+    <span class="pill gold">💬 LINE Notify</span>
+    <span class="pill blue">🌐 GitHub Pages</span>
+    <span class="pill blue">📷 Rail-IMG07</span>
+  </div>
+  <div class="cards cards-2" style="max-width:700px;margin-top:24px;">
+    <div class="card" style="text-align:left;">
+      <h3 style="color:var(--green);margin-bottom:10px;">Hardware Layer</h3>
+      <p>Arduino + เซ็นเซอร์ DHT, LDR · กล้อง IP Camera</p>
+    </div>
+    <div class="card" style="text-align:left;">
+      <h3 style="color:var(--gold);margin-bottom:10px;">AI / Automation Layer</h3>
+      <p>Claude AI + n8n Workflow + DeepDetect CV</p>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SLIDE 9: ต่อยอด ══ -->
+<div class="slide slide-9">
+  <div class="tag tag-green">การพัฒนาต่อยอด</div>
+  <h2>จาก <span class="accent">1 โรงเรือน</span> สู่ <span class="gold">เกษตรกรรมยุคใหม่</span></h2>
+  <div class="divider"></div>
+  <div class="roadmap">
+    <div class="rm">
+      <div class="rm-num">1</div>
+      <div>
+        <strong>Multi-Farm Dashboard</strong><br>
+        <small>ขยายติดตามหลายโรงเรือนพร้อมกันจาก Dashboard เดียว</small>
+      </div>
+    </div>
+    <div class="rm">
+      <div class="rm-num">2</div>
+      <div>
+        <strong>Mobile Application</strong><br>
+        <small>แจ้งเตือน + ควบคุม Relay ผ่านสมาร์ทโฟนได้ทุกที่ทุกเวลา</small>
+      </div>
+    </div>
+    <div class="rm">
+      <div class="rm-num">3</div>
+      <div>
+        <strong>AI ทำนายผลผลิต</strong><br>
+        <small>ใช้ข้อมูลย้อนหลังพยากรณ์ Yield และวางแผนการปลูกล่วงหน้า</small>
+      </div>
+    </div>
+    <div class="rm">
+      <div class="rm-num">4</div>
+      <div>
+        <strong>รองรับพืชหลายชนิด</strong><br>
+        <small>Train Model เพิ่ม ขยายจากกรีนโอ๊คไปยังผักอื่นๆ</small>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SLIDE 10: สรุป ══ -->
+<div class="slide slide-10">
+  <div class="tag tag-green">สรุป</div>
+  <h1><span class="accent">RAIL Smart Farm</span><br>โรงเรือนที่มี AI เป็นผู้ช่วย</h1>
+  <div class="divider"></div>
+  <div class="nums">
+    <div class="num-box">
+      <div class="n">3</div>
+      <div class="nl">AI Components</div>
+    </div>
+    <div class="num-box">
+      <div class="n" style="color:var(--gold);">24/7</div>
+      <div class="nl">ติดตาม Real-Time</div>
+    </div>
+    <div class="num-box">
+      <div class="n">100%</div>
+      <div class="nl">อัตโนมัติ</div>
+    </div>
+  </div>
+  <p style="text-align:center;margin-top:28px;max-width:600px;font-size:18px;">
+    ระบบที่ทำงานได้จริง · เข้าถึงได้จากทุกที่ · <br>
+    พร้อมขยายสู่เกษตรกรรมอัจฉริยะในระดับชาติ
+  </p>
+  <div style="margin-top:24px;display:flex;gap:16px;flex-wrap:wrap;justify-content:center;">
+    <span class="tag tag-green">🌐 oomtags.github.io/rail-smart-farm</span>
+    <span class="tag tag-blue">👨‍💻 github.com/oomtags/rail-smart-farm</span>
+  </div>
+</div>
+
+</div><!-- /slides -->
+
+<!-- NAV -->
+<nav class="nav">
+  <button class="nav-btn" id="prevBtn" onclick="changeSlide(-1)" disabled>← ก่อนหน้า</button>
+  <span class="slide-counter" id="counter">1 / 10</span>
+  <button class="nav-btn" id="nextBtn" onclick="changeSlide(1)">ถัดไป →</button>
+</nav>
+
+<script>
+const slides = document.querySelectorAll('.slide');
+const total  = slides.length;
+let cur = 0;
+
+function changeSlide(dir) {
+  slides[cur].classList.remove('active');
+  slides[cur].classList.add(dir > 0 ? 'prev' : '');
+  if (dir < 0) slides[cur].classList.remove('prev');
+
+  cur = Math.max(0, Math.min(total - 1, cur + dir));
+
+  slides.forEach((s, i) => {
+    s.classList.remove('active', 'prev');
+    if (i < cur) s.classList.add('prev');
+  });
+  slides[cur].classList.add('active');
+
+  document.getElementById('counter').textContent = (cur + 1) + ' / ' + total;
+  document.getElementById('prevBtn').disabled = cur === 0;
+  document.getElementById('nextBtn').disabled = cur === total - 1;
+  document.getElementById('progress').style.width = ((cur + 1) / total * 100) + '%';
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); changeSlide(1); }
+  if (e.key === 'ArrowLeft') { e.preventDefault(); changeSlide(-1); }
+});
+
+// init progress
+document.getElementById('progress').style.width = (1 / total * 100) + '%';
+</script>
+</body>
+</html>
